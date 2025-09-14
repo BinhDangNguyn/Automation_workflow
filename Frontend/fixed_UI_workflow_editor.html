@@ -1,0 +1,2153 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-widh, initial-scale=1.0">
+    <title>Advanced Workflow Automation Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d29;
+            --bg-tertiary: #252836;
+            --border-primary: #374151;
+            --border-secondary: #4b5563;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --text-muted: #9ca3af;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+        }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%); color: var(--text-primary); }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .header { background: var(--bg-secondary); border-bottom: 1px solid var(--border-primary); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }
+        .sidebar, .inspector { background: var(--bg-secondary); border-color: var(--border-primary); }
+        .node-category { background: var(--bg-tertiary); border: 1px solid var(--border-secondary); border-radius: 8px; margin-bottom: 12px; }
+        .draggable-node { background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid var(--border-secondary); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 6px; }
+        .draggable-node:hover { border-color: var(--accent-blue); background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(59, 130, 246, 0.2) 100%); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3); cursor: grab; }
+        .btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-weight: 600; border-radius: 8px; }
+        .btn-primary { background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%); border: none; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4); }
+        .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border-secondary); }
+        .btn-secondary:hover { background: var(--bg-secondary); border-color: var(--accent-blue); }
+        .btn-success { background: linear-gradient(135deg, var(--accent-green) 0%, #34d399 100%); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tabs { display: flex; background: var(--bg-tertiary); border-radius: 8px; padding: 4px; }
+        .tab { flex: 1; padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; text-align: center; color: var(--text-muted); }
+        .tab.active { background: var(--accent-blue); color: white; }
+        .tab:hover:not(.active) { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+        textarea, input, select { background: var(--bg-tertiary); border: 1px solid var(--border-secondary); border-radius: 6px; padding: 10px; color: var(--text-primary); transition: border-color 0.2s ease; }
+        textarea:focus, input:focus, select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: var(--bg-tertiary); }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border-secondary); border-radius: 3px; }
+
+        /* Panel Toggle and Resize Styles */
+        .panel-toggle {
+            position: absolute;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 12px 10px;
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 200;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        /* Specific positioning for left/right toggles */
+        #left-panel-toggle, #right-panel-toggle {
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        /* MODIFIED: Increased offset to create a gap */
+        #left-panel-toggle { right: -24px; }
+        #right-panel-toggle { left: -24px; }
+
+        /* Specific positioning for bottom toggle */
+        #bottom-panel-toggle {
+            /* MODIFIED: Increased offset to create a gap */
+            top: -26px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .panel-toggle:hover {
+            background: var(--bg-tertiary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+        #left-panel-toggle:hover, #right-panel-toggle:hover {
+            transform: translateY(-50%) scale(1.1);
+        }
+        #bottom-panel-toggle:hover {
+            transform: translateX(-50%) scale(1.1);
+        }
+
+        /* FIXED: Panel collapse states */
+        /* This rule now only applies to side panels (left/right) */
+        .panel-collapsed:not(.bottom) {
+            width: 0 !important;
+            min-width: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            border-left-width: 0 !important;
+            border-right-width: 0 !important;
+        }
+        /* This rule only handles height and is specific to the bottom panel */
+        .panel-collapsed.bottom {
+            height: 0 !important;
+            min-height: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            border-top-width: 0 !important;
+        }
+
+        .panel-collapsed > aside, .panel-collapsed > div[id$="-panel"] {
+            overflow: hidden;
+        }
+
+        #left-panel-wrapper, #right-panel-wrapper, #bottom-panel-wrapper {
+            transition: width 0.3s ease-in-out, height 0.3s ease-in-out;
+        }
+
+        .resize-handle {
+            position: absolute;
+            background: transparent;
+            z-index: 150;
+            transition: background-color 0.1s ease;
+        }
+        .resize-handle:hover { background: rgba(59, 130, 246, 0.4); }
+        .resize-handle.vertical {
+            width: 8px;
+            cursor: col-resize;
+            top: 0;
+            bottom: 0;
+        }
+        .resize-handle.horizontal {
+            height: 8px;
+            cursor: row-resize;
+            left: 0;
+            right: 0;
+        }
+
+        .resizable-divider {
+            width: 6px;
+            background: var(--border-primary);
+            cursor: col-resize;
+            transition: background-color 0.1s ease;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .resizable-divider:hover { background: var(--accent-blue); }
+        .resizable-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3px;
+            height: 20px;
+            background: rgba(107, 114, 128, 0.5);
+            border-radius: 2px;
+        }
+
+        /* Panel states - remove transitions for better performance */
+        .sidebar { overflow: hidden; }
+        .inspector { overflow: hidden; }
+        .execution-panel { overflow: hidden; }
+
+        /* Ensure main panel expands to fill space */
+        .main-content { flex: 1; min-width: 0; }
+        .canvas-container { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg-primary); }
+        .canvas { position: absolute; width: 5000px; height: 5000px; background-image: radial-gradient(circle, rgba(59, 130, 246, 0.3) 1px, transparent 1px); background-size: 25px 25px; cursor: grab; transform-origin: 0 0; }
+        .canvas.dragging { cursor: grabbing; }
+        .node { position: absolute; background: var(--bg-secondary); border: 2px solid var(--border-primary); border-radius: 12px; padding: 15px; cursor: move; user-select: none; min-width: 180px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); transition: box-shadow 0.2s, border-color 0.2s; z-index: 1; }
+        .node:hover { border-color: var(--accent-blue); }
+        .node.selected { border-color: var(--accent-blue); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+        .node-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border-primary); }
+        .node-title { color: var(--text-primary); font-weight: 600; font-size: 14px; }
+        .node-description { color: var(--text-muted); font-size: 12px; margin-bottom: 10px; }
+        .connection-point { position: absolute; width: 12px; height: 12px; border: 2px solid var(--text-primary); border-radius: 50%; cursor: crosshair; transition: all 0.2s; z-index: 3; }
+        .connection-point:hover { transform: scale(1.3); box-shadow: 0 0 12px rgba(59, 130, 246, 0.7); }
+        .connection-point.input { background: var(--accent-green); }
+        .connection-point.output { background: var(--accent-blue); }
+        .connection-point.model { background: var(--accent-purple); }
+        .connection-point.memory { background: var(--accent-yellow); }
+        .connection-point.tools { background: var(--accent-red); }
+        .connection-point.trigger { background: #ff6b35; }
+        .connection-point.model { background: var(--accent-purple); }
+        .connection-point.memory { background: var(--accent-yellow); }
+        .node-model { border-color: var(--accent-purple); }
+        .node-memory { border-color: var(--accent-yellow); }
+        .node-tools { border-color: var(--accent-red); }
+        .connection-suggestions {
+            position: fixed;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 8px;
+            z-index: 1000;
+            max-width: 250px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        .suggestion-item:hover {
+            background: var(--bg-tertiary);
+        }
+        .suggestion-item i {
+            margin-right: 8px;
+            width: 16px;
+        }
+        .connection-point-label { position: absolute; font-size: 10px; color: var(--text-muted); white-space: nowrap; z-index: 2; pointer-events: none; }
+        .cp-left { left: -8px; }
+        .cp-right { right: -8px; }
+        .cp-top { top: -8px; left: 50%; transform: translateX(-50%); }
+        .cp-bottom { bottom: -8px; left: 50%; transform: translateX(-50%); }
+        .cp-left-top { left: -8px; top: 25%; transform: translateY(-50%); }
+        .cp-left-bottom { left: -8px; bottom: 25%; transform: translateY(50%); }
+        .cp-right-top { right: -8px; top: 25%; transform: translateY(-50%); }
+        .cp-right-bottom { right: -8px; bottom: 25%; transform: translateY(50%); }
+        .cp-bottom-left { bottom: -8px; left: 25%; }
+        .cp-bottom-right { bottom: -8px; right: 25%; }
+        .chat-message { margin-bottom: 8px; }
+        .chat-message.user { text-align: right; }
+        .chat-message.bot { text-align: left; }
+        .chat-message.system { text-align: center; }
+        .chat-message.system .bg-gray-600 { background: var(--accent-yellow) !important; color: black !important; }
+        .connections-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .connection-preview { stroke: var(--accent-purple); stroke-width: 2; stroke-dasharray: 6, 6; fill: none; opacity: 0.8; }
+        .connection-group { pointer-events: all; cursor: pointer; }
+        .connection { stroke: var(--accent-blue); stroke-width: 2.5px; fill: none; transition: stroke 0.2s, stroke-width 0.2s; pointer-events: stroke; stroke-linecap: round; }
+        .connection-model { stroke: var(--accent-purple); }
+        .connection-memory { stroke: var(--accent-yellow); }
+        .connection-tools { stroke: var(--accent-red); }
+        .connection-trigger { stroke: #ff6b35; }
+        .connection-group:hover .connection { stroke-width: 4px; }
+        .connection-group.selected .connection { stroke: var(--accent-red); stroke-width: 4px; }
+        .zoom-indicator { position: absolute; bottom: 20px; left: 20px; background: rgba(15, 17, 23, 0.9); padding: 8px 12px; border-radius: 6px; color: var(--text-primary); font-size: 12px; backdrop-filter: blur(10px); z-index: 50; }
+        #confirmationModal { z-index: 1001; backdrop-filter: blur(5px); }
+        #confirmationModal .glass { background: rgba(30, 33, 45, 0.8); border: 1px solid var(--border-primary); }
+        #confirmationModal .btn-primary { background: linear-gradient(135deg, var(--accent-red) 0%, #dc2626 100%); }
+        #confirmationModal .btn-primary:hover:not(:disabled) { box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4); }
+        .status-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .status-running { background: var(--accent-yellow); animation: pulse 2s infinite; }
+        .status-success { background: var(--accent-green); }
+        .status-error { background: var(--accent-red); }
+        .status-idle { background: var(--text-muted); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .execution-timeline { border-left: 2px solid var(--border-secondary); padding-left: 16px; margin-left: 8px; }
+        .timeline-item { margin-bottom: 12px; position: relative; }
+        .timeline-item::before { content: ''; position: absolute; left: -21px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-blue); }
+    </style>
+</head>
+<body class="h-full flex flex-col">
+    <header class="header p-4 flex justify-between items-center flex-shrink-0">
+        <div class="flex items-center space-x-6">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                <i class="fas fa-project-diagram mr-2"></i> AutoFlow Studio
+            </h1>
+            <div class="flex items-center space-x-4">
+                <span class="status-indicator status-idle"></span>
+                <span class="text-sm text-gray-400">Ready</span>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="saveWorkflow()" class="btn btn-secondary text-white py-2 px-4"><i class="fas fa-save mr-2"></i>Save</button>
+            <button onclick="exportWorkflow()" class="btn btn-secondary text-white py-2 px-4"><i class="fas fa-file-export mr-2"></i>Export</button>
+            <button onclick="confirmDeleteSelected()" class="btn btn-secondary text-white py-2 px-4"><i class="fas fa-trash mr-2"></i>Delete Selected</button>
+            <button id="run-workflow-btn" onclick="runWorkflow()" class="btn btn-primary text-white py-2 px-4"><i class="fas fa-play mr-2"></i>Execute Workflow</button>
+        </div>
+    </header>
+
+    <div class="flex-grow flex flex-col overflow-hidden">
+        <div class="flex flex-grow overflow-hidden">
+            <!-- LEFT PANEL WRAPPER -->
+            <div id="left-panel-wrapper" class="relative flex-shrink-0" style="width: 20rem;">
+                <aside id="left-panel" class="sidebar w-full h-full border-r flex flex-col bg-gray-800">
+                    <div class="p-4 pb-0 flex-shrink-0">
+                        <h2 class="text-lg font-semibold mb-4">Node Library</h2>
+                        <button onclick="showIDEMode()" class="btn btn-success text-white font-bold py-3 px-4 rounded-lg mb-4 w-full">
+                            <i class="fas fa-plus-circle mr-2"></i>Create Custom Node
+                        </button>
+                        <div class="relative mb-4">
+                            <input type="text" id="node-search" placeholder="Search nodes..." class="w-full pl-10 pr-4 py-2 text-sm">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow overflow-y-auto scrollbar-thin pl-4 pr-6">
+                        <div id="node-categories" class="flex-grow"></div>
+                    </div>
+                </aside>
+                <div class="resize-handle vertical" style="right: -4px; top: 0; bottom: 0;" data-panel="left"></div>
+                <div class="panel-toggle" id="left-panel-toggle" onclick="togglePanel('left')" title="Toggle Left Panel">
+                    <i class="fas fa-chevron-left" id="left-toggle-icon"></i>
+                </div>
+            </div>
+
+            <main id="main-panel" class="main-content flex-grow relative">
+                <div class="canvas-container" id="canvasContainer">
+                    <div class="canvas" id="canvas">
+                        <svg class="connections-svg" id="connectionsSvg"></svg>
+                    </div>
+                </div>
+                <div class="zoom-indicator" id="zoomIndicator">Zoom: 100%</div>
+                <div class="absolute top-4 left-1/2 transform -translate-x-1/2 flex space-x-2 glass rounded-lg p-2">
+                    <button onclick="zoomIn()" class="p-2 hover:bg-white hover:bg-opacity-10 rounded"><i class="fas fa-search-plus"></i></button>
+                    <button onclick="zoomOut()" class="p-2 hover:bg-white hover:bg-opacity-10 rounded"><i class="fas fa-search-minus"></i></button>
+                    <button onclick="resetZoom()" class="p-2 hover:bg-white hover:bg-opacity-10 rounded"><i class="fas fa-expand-alt"></i></button>
+                </div>
+            </main>
+
+            <!-- RIGHT PANEL WRAPPER -->
+            <div id="right-panel-wrapper" class="relative flex-shrink-0" style="width: 24rem;">
+                <aside id="right-panel" class="inspector w-full h-full border-l flex flex-col bg-gray-800">
+                     <div class="p-4 pb-2 flex-shrink-0">
+                        <div id="inspector-tabs" class="tabs mb-4">
+                            <div class="tab active" onclick="switchTab(this, 'properties')"><i class="fas fa-cog mr-1"></i>Properties</div>
+                            <div class="tab" onclick="switchTab(this, 'code')"><i class="fas fa-code mr-1"></i>Code</div>
+                            <div class="tab" onclick="switchTab(this, 'docs')"><i class="fas fa-book mr-1"></i>Docs</div>
+                        </div>
+                     </div>
+                     <div class="flex-grow overflow-y-auto scrollbar-thin pl-4 pr-6">
+                        <div id="inspector-content"></div>
+                     </div>
+                </aside>
+                <div class="resize-handle vertical" style="left: -4px; top: 0; bottom: 0;" data-panel="right"></div>
+                <div class="panel-toggle" id="right-panel-toggle" onclick="togglePanel('right')" title="Toggle Right Panel">
+                    <i class="fas fa-chevron-right" id="right-toggle-icon"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM PANEL WRAPPER -->
+        <div id="bottom-panel-wrapper" class="relative flex-shrink-0" style="height: 20rem;">
+             <div id="bottom-panel" class="execution-panel bg-gray-900 border-t border-gray-700 p-4 w-full h-full flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-semibold">Execution Monitor</h2>
+                    <div class="flex space-x-2">
+                        <button onclick="clearLogs()" class="btn btn-secondary py-1 px-3 text-sm"><i class="fas fa-trash mr-1"></i>Clear</button>
+                    </div>
+                </div>
+                <div class="flex-grow flex overflow-hidden">
+                    <div id="execution-tabs-section" class="flex flex-col flex-grow min-w-0">
+                        <div id="execution-tabs" class="tabs mb-2">
+                            <div class="tab active" onclick="switchExecutionTab(this, 'logs')"><i class="fas fa-terminal mr-1"></i>Logs</div>
+                            <div class="tab" onclick="switchExecutionTab(this, 'timeline')"><i class="fas fa-clock mr-1"></i>Timeline</div>
+                            <div class="tab" onclick="switchExecutionTab(this, 'nodes')"><i class="fas fa-sitemap mr-1"></i>Nodes Output</div>
+                            <div class="tab" onclick="switchExecutionTab(this, 'chat')" id="chat-tab" style="display: none;"><i class="fas fa-comments mr-1"></i>Chat</div>
+                        </div>
+                        <div class="flex-grow relative">
+                             <pre id="execution-logs-container" class="absolute inset-0 bg-black text-gray-300 p-3 rounded-lg overflow-y-auto text-xs scrollbar-thin"></pre>
+                             <div id="execution-timeline-container" class="absolute inset-0 execution-timeline h-full overflow-y-auto scrollbar-thin hidden"></div>
+                             <div id="node-outputs-container" class="absolute inset-0 bg-gray-900 p-3 rounded-lg overflow-y-auto scrollbar-thin hidden">
+                                <div class="text-sm text-gray-400">Execute workflow to see node outputs...</div>
+                             </div>
+                             <div id="chat-container" class="absolute inset-0 bg-gray-800 rounded-lg p-3 hidden flex flex-col">
+                                <div id="chat-messages" class="flex-grow overflow-y-auto scrollbar-thin mb-3 space-y-2"></div>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="chat-input" placeholder="Type your message..." class="flex-grow" onkeypress="handleChatKeyPress(event)">
+                                    <button onclick="sendChatMessage()" class="btn btn-primary py-2 px-4"><i class="fas fa-paper-plane"></i></button>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Resizable divider -->
+                    <div class="resizable-divider" id="bottom-panel-divider" data-divider="bottom"></div>
+
+                    <div id="analytics-section" class="flex-shrink-0" style="width: 300px;">
+                        <h3 class="font-bold text-md mb-2"><i class="fas fa-chart-line mr-1"></i>Results & Analytics</h3>
+                        <div class="space-y-3">
+                            <div class="bg-gray-800 p-3 rounded-lg"><div class="text-xs text-gray-400 mb-1">Execution Time</div><div id="execution-time" class="text-lg font-mono text-blue-400">--</div></div>
+                            <div class="bg-gray-800 p-3 rounded-lg"><div class="text-xs text-gray-400 mb-1">Nodes Processed</div><div id="nodes-processed" class="text-lg font-mono text-green-400">0</div></div>
+                            <div class="bg-gray-800 p-3 rounded-lg flex-grow"><div class="text-xs text-gray-400 mb-2">Final Output</div><pre id="execution-result" class="text-xs text-green-400 overflow-y-auto scrollbar-thin max-h-32"></pre></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="resize-handle horizontal" style="top: -4px;" data-panel="bottom"></div>
+            <div class="panel-toggle" id="bottom-panel-toggle" onclick="togglePanel('bottom')" title="Toggle Bottom Panel">
+                <!-- MODIFIED: Changed initial icon to down arrow since panel is open -->
+                <i class="fas fa-chevron-down" id="bottom-toggle-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmationModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden z-50">
+        <div class="glass rounded-xl shadow-2xl p-6 w-full max-w-md flex flex-col">
+            <h2 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent mb-6">Confirm Action</h2>
+            <p id="modalMessage" class="text-white text-lg mb-6"></p>
+            <div class="flex justify-end space-x-3 mt-4">
+                <button id="modalCancelBtn" class="btn btn-secondary py-2 px-4">Cancel</button>
+                <button id="modalConfirmBtn" class="btn btn-primary py-2 px-4">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Self-executing anonymous function to avoid polluting the global scope
+    (() => {
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let nodeCount = 0, connections = [], selectedItems = new Set(), highestZ = 1;
+            let connecting = false, connectionStart = null;
+            let canvasTransform = { x: 0, y: 0, scale: 1 }, isPanningCanvas = false, panStart = { x: 0, y: 0 };
+            let monacoInstance = null, currentInspectorTab = 'properties', activeNode = null;
+            let confirmCallback = null;
+            let nodeConfigurations = {}; // Store node configurations
+
+            // --- DOM ELEMENTS ---
+            const canvas = document.getElementById('canvas'), canvasContainer = document.getElementById('canvasContainer'), connectionsSvg = document.getElementById('connectionsSvg');
+            const confirmationModal = document.getElementById('confirmationModal'), modalMessage = document.getElementById('modalMessage'), modalConfirmBtn = document.getElementById('modalConfirmBtn'), modalCancelBtn = document.getElementById('modalCancelBtn');
+            const inspectorContent = document.getElementById('inspector-content');
+
+            // --- NODE DATA & TEMPLATES ---
+            const pythonCodeTemplate = `# AutoFlow Studio Custom Node\ndef execute(input_data: dict) -> dict:\n    # Your code here\n    query = input_data.get('query', '')\n    console_log(f"Processing query: {query}")\n    return {"result": f"Processed: {query}", "status": "success"}\n\ndef console_log(message):\n    print(f"[DEBUG] {message}")`;
+            let nodeLibrary = {
+                'triggers': {
+                    name: 'Triggers', icon: 'fa-play-circle', nodes: {
+                        'start': {
+                            name: 'Start', icon: 'fa-play-circle', description: 'Workflow entry point',
+                            nodeType: 'trigger',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'trigger' }],
+                            code: `def execute(): return {"status": "started"}`,
+                            content: `<p class="text-sm text-gray-300">Workflow entry point.</p>`
+                        },
+                        'webhook': {
+                            name: 'Webhook', icon: 'fa-globe', description: 'Receives HTTP requests',
+                            nodeType: 'trigger',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'webhook' }],
+                            code: `def execute(method="POST", path="/webhook"): return {"method": method, "path": path}`,
+                            content: `<input type="text" value="/webhook" class="w-full">`
+                        },
+                        'schedule': {
+                            name: 'Schedule', icon: 'fa-clock', description: 'Time-based trigger',
+                            nodeType: 'trigger',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'trigger' }],
+                            code: `def execute(interval="daily"): return {"triggered_at": "now"}`,
+                            content: `<select class="w-full"><option>Daily</option><option>Hourly</option><option>Weekly</option></select>`
+                        },
+                        'chat': {
+                            name: 'Chat Trigger', icon: 'fa-comments', description: 'Triggered by chat messages',
+                            nodeType: 'trigger',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'message' }],
+                            code: `def execute(message=""): return {"message": message, "timestamp": "now", "user": "user"}`,
+                            content: `<div class="space-y-2"><label class="block text-sm">Chat Title</label><input type="text" placeholder="My Chat Bot" class="w-full"><label class="flex items-center mt-2"><input type="checkbox" class="mr-2">Enable Chat History</label></div>`
+                        }
+                    }
+                },
+                'ai': {
+                    name: 'AI & LLM', icon: 'fa-robot', nodes: {
+                        'ai-agent': {
+                            name: 'AI Agent', icon: 'fa-robot', description: 'Advanced AI agent with tools',
+                            nodeType: 'agent',
+                            connectionPoints: [
+                                { type: 'input', position: 'left', label: 'input' },
+                                { type: 'output', position: 'right', label: 'output' },
+                                { type: 'input', position: 'top', label: 'model' },
+                                { type: 'input', position: 'bottom-left', label: 'memory' },
+                                { type: 'input', position: 'bottom-right', label: 'tools' }
+                            ],
+                            code: `def execute(input_data, model="qwen3:8b", memory=None, tools=None): return {"response": "AI processed"}`,
+                            content: `<textarea placeholder="System prompt..." class="w-full h-16"></textarea>`
+                        },
+                        'llm-agent': {
+                            name: 'Simple LLM', icon: 'fa-brain', description: 'Basic LLM processing',
+                            nodeType: 'processing',
+                            connectionPoints: [
+                                { type: 'input', position: 'left', label: 'input' },
+                                { type: 'output', position: 'right', label: 'output' }
+                            ],
+                            code: `def execute(prompt, model="qwen3:8b"): return {"response": "LLM response"}`,
+                            content: `<input type="text" placeholder="Model name" class="w-full">`
+                        }
+                    }
+                },
+                'models': {
+                    name: 'AI Models', icon: 'fa-microchip', nodes: {
+                        'chatgpt': {
+                            name: 'ChatGPT', icon: 'fa-openai', description: 'OpenAI GPT models',
+                            nodeType: 'model',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'model' }],
+                            code: `def execute(): return {"provider": "openai", "model": "gpt-4", "api_key": "your-key"}`,
+                            content: `<select class="w-full mb-2"><option>gpt-4</option><option>gpt-3.5-turbo</option></select><input type="password" placeholder="API Key" class="w-full">`
+                        },
+                        'gemini': {
+                            name: 'Gemini', icon: 'fa-google', description: 'Google Gemini models',
+                            nodeType: 'model',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'model' }],
+                            code: `def execute(): return {"provider": "google", "model": "gemini-pro", "api_key": "your-key"}`,
+                            content: `<select class="w-full mb-2"><option>gemini-pro</option><option>gemini-pro-vision</option></select><input type="password" placeholder="API Key" class="w-full">`
+                        },
+                        'ollama': {
+                            name: 'Ollama', icon: 'fa-server', description: 'Local Ollama models',
+                            nodeType: 'model',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'model' }],
+                            code: `def execute(): return {"provider": "ollama", "model": "qwen3:8b", "url": "http://localhost:11434"}`,
+                            content: `<div class="space-y-2"><select id="ollama-model-select" class="w-full"><option value="qwen3:8b">Loading models...</option></select><input type="text" placeholder="Ollama URL" value="http://localhost:11434" class="w-full" id="ollama-url"><button onclick="fetchOllamaModels()" class="btn btn-secondary w-full text-sm py-1"><i class="fas fa-sync mr-1"></i>Refresh Models</button></div>`
+                        }
+                    }
+                },
+                'memory': {
+                    name: 'Memory Systems', icon: 'fa-memory', nodes: {
+                        'buffer-memory': {
+                            name: 'Buffer Memory', icon: 'fa-layer-group', description: 'Simple conversation buffer',
+                            nodeType: 'memory',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'memory' }],
+                            code: `def execute(): return {"type": "buffer", "max_tokens": 4000, "system_prompt": ""}`,
+                            content: `<input type="number" placeholder="Max tokens" value="4000" class="w-full mb-2"><textarea placeholder="System prompt..." class="w-full h-16"></textarea>`
+                        },
+                        'short-term-memory': {
+                            name: 'Short Term', icon: 'fa-clock', description: 'Short-term memory with expiration',
+                            nodeType: 'memory',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'memory' }],
+                            code: `def execute(): return {"type": "short_term", "ttl": 3600, "max_items": 100}`,
+                            content: `<input type="number" placeholder="TTL (seconds)" value="3600" class="w-full mb-2"><input type="number" placeholder="Max items" value="100" class="w-full">`
+                        },
+                        'long-term-memory': {
+                            name: 'Long Term', icon: 'fa-database', description: 'Persistent long-term memory',
+                            nodeType: 'memory',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'memory' }],
+                            code: `def execute(): return {"type": "long_term", "storage": "file", "path": "./memory.json"}`,
+                            content: `<select class="w-full mb-2"><option value="file">File Storage</option><option value="sqlite">SQLite</option><option value="redis">Redis</option></select><input type="text" placeholder="Storage path" class="w-full">`
+                        },
+                        'vector-memory': {
+                            name: 'Vector Memory', icon: 'fa-project-diagram', description: 'Semantic vector search memory',
+                            nodeType: 'memory',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'memory' }],
+                            code: `def execute(): return {"type": "vector", "embedding_model": "sentence-transformers", "index_type": "faiss"}`,
+                            content: `<select class="w-full mb-2"><option>sentence-transformers</option><option>openai-embeddings</option></select><input type="text" placeholder="Collection name" class="w-full">`
+                        }
+                    }
+                },
+                'tools': {
+                    name: 'Tool Systems', icon: 'fa-tools', nodes: {
+                        'web-tools': {
+                            name: 'Web Tools', icon: 'fa-globe', description: 'Web browsing and search tools',
+                            nodeType: 'tools',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'tools' }],
+                            code: `def execute(): return {"tools": ["web_search", "web_scrape", "url_fetch"]}`,
+                            content: `<div class="space-y-2"><label class="flex items-center"><input type="checkbox" checked> Web Search</label><label class="flex items-center"><input type="checkbox" checked> Web Scraping</label><label class="flex items-center"><input type="checkbox"> URL Fetch</label></div>`
+                        },
+                        'file-tools': {
+                            name: 'File Tools', icon: 'fa-file', description: 'File system operations',
+                            nodeType: 'tools',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'tools' }],
+                            code: `def execute(): return {"tools": ["read_file", "write_file", "list_directory"]}`,
+                            content: `<div class="space-y-2"><label class="flex items-center"><input type="checkbox" checked> Read File</label><label class="flex items-center"><input type="checkbox" checked> Write File</label><label class="flex items-center"><input type="checkbox"> List Directory</label></div>`
+                        },
+                        'code-tools': {
+                            name: 'Code Tools', icon: 'fa-code', description: 'Code execution and analysis',
+                            nodeType: 'tools',
+                            connectionPoints: [{ type: 'output', position: 'right', label: 'tools' }],
+                            code: `def execute(): return {"tools": ["execute_python", "analyze_code", "format_code"]}`,
+                            content: `<div class="space-y-2"><label class="flex items-center"><input type="checkbox" checked> Execute Python</label><label class="flex items-center"><input type="checkbox"> Analyze Code</label><label class="flex items-center"><input type="checkbox"> Format Code</label></div>`
+                        }
+                    }
+                },
+                'system': {
+                    name: 'System Logic', icon: 'fa-microchip', nodes: {
+                        'if-else': {
+                            name: 'If/Else', icon: 'fa-code-branch', description: 'Conditional logic',
+                            nodeType: 'system',
+                            connectionPoints: [
+                                { type: 'input', position: 'left', label: 'input' },
+                                { type: 'output', position: 'right-top', label: 'true' },
+                                { type: 'output', position: 'right-bottom', label: 'false' }
+                            ],
+                            code: `def execute(input_data, condition="true"): return {"result": condition == "true"}`,
+                            content: `<input type="text" placeholder="Condition..." class="w-full">`
+                        },
+                        'and-gate': {
+                            name: 'AND Gate', icon: 'fa-share-alt', description: 'Logical AND operation',
+                            nodeType: 'system',
+                            connectionPoints: [
+                                { type: 'input', position: 'left-top', label: 'input1' },
+                                { type: 'input', position: 'left-bottom', label: 'input2' },
+                                { type: 'output', position: 'right', label: 'output' }
+                            ],
+                            code: `def execute(input1, input2): return {"result": bool(input1) and bool(input2)}`,
+                            content: ``
+                        },
+                        'or-gate': {
+                            name: 'OR Gate', icon: 'fa-code-branch', description: 'Logical OR operation',
+                            nodeType: 'system',
+                            connectionPoints: [
+                                { type: 'input', position: 'left-top', label: 'input1' },
+                                { type: 'input', position: 'left-bottom', label: 'input2' },
+                                { type: 'output', position: 'right', label: 'output' }
+                            ],
+                            code: `def execute(input1, input2): return {"result": bool(input1) or bool(input2)}`,
+                            content: ``
+                        }
+                    }
+                },
+                'data': {
+                    name: 'Data Processing', icon: 'fa-database', nodes: {
+                        'web-search': {
+                            name: 'Web Search', icon: 'fa-search', description: 'Searches the web',
+                            nodeType: 'processing',
+                            connectionPoints: [
+                                { type: 'input', position: 'left', label: 'query' },
+                                { type: 'output', position: 'right', label: 'results' }
+                            ],
+                            code: `def execute(query): return {"results": f"Search for: {query}"}`,
+                            content: `<input type="text" placeholder="Search query..." class="w-full">`
+                        },
+                        'data-transform': {
+                            name: 'Transform Data', icon: 'fa-exchange-alt', description: 'Manipulate data',
+                            nodeType: 'processing',
+                            connectionPoints: [
+                                { type: 'input', position: 'left', label: 'input' },
+                                { type: 'output', position: 'right', label: 'output' }
+                            ],
+                            code: `def execute(data): return {"transformed": data}`,
+                            content: `<textarea placeholder="{...}" class="w-full h-16"></textarea>`
+                        }
+                    }
+                },
+                'output': {
+                    name: 'Output', icon: 'fa-paper-plane', nodes: {
+                        'chat-output': {
+                            name: 'Chat Output', icon: 'fa-comment-dots', description: 'Process AI responses for chat',
+                            nodeType: 'output',
+                            connectionPoints: [{ type: 'input', position: 'left', label: 'input' }],
+                            code: `def execute(input_data): return {"chat_response": input_data, "processed": True}`,
+                            content: `<div class="space-y-2">
+                                <p class="text-sm text-gray-300">Processes AI agent responses for chat output.</p>
+                                <div class="text-xs text-gray-400">
+                                    <div>• Handles thinking models (&lt;think&gt; tags)</div>
+                                    <div>• Extracts final response for chat</div>
+                                    <div>• Preserves raw output for debugging</div>
+                                </div>
+                            </div>`
+                        },
+                        'log-message': {
+                            name: 'Log Message', icon: 'fa-terminal', description: 'Log to console',
+                            nodeType: 'output',
+                            connectionPoints: [
+                                { type: 'input', position: 'left', label: 'message' }
+                            ],
+                            code: `def execute(message): console_log(message)`,
+                            content: ``
+                        },
+                        'send-email': {
+                            name: 'Send Email', icon: 'fa-envelope', description: 'Send email notifications',
+                            nodeType: 'output',
+                            connectionPoints: [
+                                { type: 'input', position: 'left', label: 'input' },
+                                { type: 'output', position: 'right', label: 'result' }
+                            ],
+                            code: `def execute(to, sub, body): return {"sent": True}`,
+                            content: `<input type="email" placeholder="recipient@example.com" class="w-full">`
+                        }
+                    }
+                }
+            };
+            const getNodeData = (type) => {
+                for (const category of Object.values(nodeLibrary)) { if (category.nodes[type]) return category.nodes[type]; } return null;
+            };
+
+            // --- CORE CANVAS/NODE/CONNECTION LOGIC --- (Functions from previous implementation)
+            const updateCanvasTransform = () => { canvas.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; document.getElementById('zoomIndicator').textContent = `Zoom: ${Math.round(canvasTransform.scale * 100)}%`; updateConnections(); };
+            window.zoomIn = () => { canvasTransform.scale = Math.min(canvasTransform.scale * 1.2, 3); updateCanvasTransform(); };
+            window.zoomOut = () => { canvasTransform.scale = Math.max(canvasTransform.scale / 1.2, 0.2); updateCanvasTransform(); };
+            window.resetZoom = () => { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; updateCanvasTransform(); };
+
+            // --- PANEL MANAGEMENT ---
+            let panelStates = { left: true, right: true, bottom: true };
+            let resizeState = { isResizing: false, panel: null, startX: 0, startY: 0, startWidth: 0, startHeight: 0 };
+            let originalSizes = { left: 320, right: 384, bottom: 320 }; // Store original panel sizes
+
+            window.togglePanel = (panel) => {
+                const panelWrapper = document.getElementById(`${panel}-panel-wrapper`);
+                const toggleIcon = document.getElementById(`${panel}-toggle-icon`);
+
+                panelStates[panel] = !panelStates[panel];
+
+                if (panelStates[panel]) {
+                    // Show panel - restore original size
+                    panelWrapper.classList.remove('panel-collapsed');
+                    if (panel === 'left' || panel === 'right') {
+                        panelWrapper.style.width = originalSizes[panel] + 'px';
+                    } else if (panel === 'bottom') {
+                        panelWrapper.style.height = originalSizes.bottom + 'px';
+                    }
+                    // Update icons to "collapse" state
+                    if (panel === 'left') toggleIcon.className = 'fas fa-chevron-left';
+                    else if (panel === 'right') toggleIcon.className = 'fas fa-chevron-right';
+                    // MODIFIED: Inverted icon logic for bottom panel
+                    else if (panel === 'bottom') toggleIcon.className = 'fas fa-chevron-down';
+                } else {
+                    // Hide panel - save current size first
+                    if (panel === 'left' || panel === 'right') {
+                        originalSizes[panel] = panelWrapper.offsetWidth;
+                    } else if (panel === 'bottom') {
+                        originalSizes.bottom = panelWrapper.offsetHeight;
+                    }
+
+                    panelWrapper.classList.add('panel-collapsed');
+                    if (panel === 'bottom') panelWrapper.classList.add('bottom');
+
+                    // Update icons to "expand" state
+                    if (panel === 'left') toggleIcon.className = 'fas fa-chevron-right';
+                    else if (panel === 'right') toggleIcon.className = 'fas fa-chevron-left';
+                    // MODIFIED: Inverted icon logic for bottom panel
+                    else if (panel === 'bottom') toggleIcon.className = 'fas fa-chevron-up';
+                }
+            };
+
+            // --- RESIZE FUNCTIONALITY ---
+            const initResizeHandles = () => {
+                const resizeHandles = document.querySelectorAll('.resize-handle');
+                const resizeDividers = document.querySelectorAll('.resizable-divider');
+
+                // Handle panel borders
+                resizeHandles.forEach(handle => {
+                    handle.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const panel = handle.getAttribute('data-panel');
+                        const panelElement = document.getElementById(`${panel}-panel-wrapper`);
+
+                        resizeState.isResizing = true;
+                        resizeState.panel = panel;
+                        resizeState.startX = e.clientX;
+                        resizeState.startY = e.clientY;
+                        resizeState.panelElement = panelElement;
+
+                        if (panel === 'left' || panel === 'right') {
+                            resizeState.startWidth = panelElement.offsetWidth;
+                        } else if (panel === 'bottom') {
+                            resizeState.startHeight = panelElement.offsetHeight;
+                        }
+
+                        // Disable transitions for smoother resizing
+                        panelElement.style.transition = 'none';
+
+                        document.body.style.cursor = handle.classList.contains('vertical') ? 'col-resize' : 'row-resize';
+                        document.body.style.userSelect = 'none';
+                        document.addEventListener('mousemove', handleResize);
+                        document.addEventListener('mouseup', stopResize);
+                    });
+                });
+
+                // Handle bottom panel divider
+                resizeDividers.forEach(divider => {
+                    divider.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const tabsSection = document.getElementById('execution-tabs-section');
+                        const analyticsSection = document.getElementById('analytics-section');
+
+                        resizeState.isResizing = true;
+                        resizeState.panel = 'divider';
+                        resizeState.startX = e.clientX;
+                        resizeState.startWidth = tabsSection.offsetWidth;
+                        resizeState.analyticsWidth = analyticsSection.offsetWidth;
+                        resizeState.tabsElement = tabsSection;
+                        resizeState.analyticsElement = analyticsSection;
+
+                        // Disable transitions
+                        tabsSection.style.transition = 'none';
+                        analyticsSection.style.transition = 'none';
+
+                        document.body.style.cursor = 'col-resize';
+                        document.body.style.userSelect = 'none';
+                        document.addEventListener('mousemove', handleResize);
+                        document.addEventListener('mouseup', stopResize);
+                    });
+                });
+            };
+
+            const handleResize = (e) => {
+                if (!resizeState.isResizing) return;
+
+                // Use requestAnimationFrame for smoother resizing
+                requestAnimationFrame(() => {
+                    const deltaX = e.clientX - resizeState.startX;
+                    const deltaY = e.clientY - resizeState.startY;
+
+                    if (resizeState.panel === 'left') {
+                        const newWidth = Math.max(200, Math.min(600, resizeState.startWidth + deltaX));
+                        resizeState.panelElement.style.width = newWidth + 'px';
+                        originalSizes.left = newWidth;
+                    } else if (resizeState.panel === 'right') {
+                        const newWidth = Math.max(250, Math.min(800, resizeState.startWidth - deltaX));
+                        resizeState.panelElement.style.width = newWidth + 'px';
+                        originalSizes.right = newWidth;
+                    } else if (resizeState.panel === 'bottom') {
+                        const newHeight = Math.max(200, Math.min(600, resizeState.startHeight - deltaY));
+                        resizeState.panelElement.style.height = newHeight + 'px';
+                        originalSizes.bottom = newHeight;
+                    } else if (resizeState.panel === 'divider') {
+                        const container = document.getElementById('bottom-panel');
+                        const containerWidth = container.offsetWidth - 26; // Account for padding and divider
+                        const newTabsWidth = Math.max(300, Math.min(containerWidth - 250, resizeState.startWidth + deltaX));
+                        const newAnalyticsWidth = containerWidth - newTabsWidth;
+
+                        resizeState.tabsElement.style.width = newTabsWidth + 'px';
+                        resizeState.analyticsElement.style.width = newAnalyticsWidth + 'px';
+                    }
+                });
+            };
+
+            const stopResize = () => {
+                if (resizeState.panelElement) {
+                    // Re-enable transitions
+                    resizeState.panelElement.style.transition = '';
+                }
+                if (resizeState.tabsElement) {
+                    resizeState.tabsElement.style.transition = '';
+                }
+                if (resizeState.analyticsElement) {
+                    resizeState.analyticsElement.style.transition = '';
+                }
+
+                resizeState.isResizing = false;
+                resizeState.panel = null;
+                resizeState.panelElement = null;
+                resizeState.tabsElement = null;
+                resizeState.analyticsElement = null;
+
+                document.body.style.cursor = 'default';
+                document.body.style.userSelect = '';
+                document.removeEventListener('mousemove', handleResize);
+                document.removeEventListener('mouseup', stopResize);
+            };
+
+            // Initialize resize handles when DOM is ready
+            setTimeout(initResizeHandles, 100);
+            const clearSelection = () => { selectedItems.forEach(item => item.classList.remove('selected')); selectedItems.clear(); activeNode = null; };
+            const deleteNode = (nodeId) => { const node = document.getElementById(nodeId); if (!node) return; connections = connections.filter(conn => { if (conn.start.node === node || conn.end.node === node) { const group = document.getElementById(conn.id); if (group) group.remove(); selectedItems.delete(group); return false; } return true; }); selectedItems.delete(node); node.remove(); };
+            const deleteSelected = () => { Array.from(selectedItems).forEach(item => { if (item.classList.contains('node')) { deleteNode(item.id); } else if (item.classList.contains('connection-group')) { deleteConnection(item.id); } }); clearSelection(); showDefaultInspector(); };
+            const deleteConnection = (groupId) => { connections = connections.filter(conn => conn.id !== groupId); const group = document.getElementById(groupId); if (group) { selectedItems.delete(group); group.remove(); } };
+            const getMousePositionOnCanvas = e => { const rect = canvasContainer.getBoundingClientRect(); return { x: (e.clientX - rect.left - canvasTransform.x) / canvasTransform.scale, y: (e.clientY - rect.top - canvasTransform.y) / canvasTransform.scale }; };
+            const getConnectionPointPosition = (node, point) => { const pRect = point.getBoundingClientRect(), cRect = canvasContainer.getBoundingClientRect(); return { x: (pRect.left + pRect.width / 2 - cRect.left - canvasTransform.x) / canvasTransform.scale, y: (pRect.top + pRect.height / 2 - cRect.top - canvasTransform.y) / canvasTransform.scale }; };
+            const createConnection = (start, end) => {
+                const conn = {
+                    id: `conn-${Date.now()}`,
+                    start: {
+                        node: start.node,
+                        point: start.point,
+                        type: start.type,
+                        label: start.label,
+                        index: start.index
+                    },
+                    end: {
+                        node: end.node,
+                        point: end.point,
+                        type: end.type,
+                        label: end.label,
+                        index: end.index
+                    }
+                };
+                connections.push(conn);
+
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                group.id = conn.id;
+                group.classList.add('connection-group');
+
+                // Color code connections by type
+                let connectionClass = 'connection';
+                if (start.label === 'model' || end.label === 'model') connectionClass += ' connection-model';
+                else if (start.label === 'memory' || end.label === 'memory') connectionClass += ' connection-memory';
+                else if (start.label === 'tools' || end.label === 'tools') connectionClass += ' connection-tools';
+                else if (start.label === 'trigger' || end.label === 'trigger') connectionClass += ' connection-trigger';
+
+                group.innerHTML = `<path class="${connectionClass}"></path>`;
+                connectionsSvg.appendChild(group);
+
+                group.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (!e.ctrlKey && !e.metaKey) clearSelection();
+                    group.classList.toggle('selected');
+                    if (group.classList.contains('selected')) selectedItems.add(group);
+                    else selectedItems.delete(group);
+                });
+
+                updateConnections();
+            };
+            const updateConnections = () => { connections.forEach(conn => { const group = document.getElementById(conn.id); if (!group) return; const line = group.querySelector('.connection'), startPos = getConnectionPointPosition(conn.start.node, conn.start.point), endPos = getConnectionPointPosition(conn.end.node, conn.end.point); const dx = endPos.x - startPos.x, cpo = Math.max(Math.abs(dx) * 0.5, 50); line.setAttribute('d', `M ${startPos.x} ${startPos.y} C ${startPos.x + cpo} ${startPos.y} ${endPos.x - cpo} ${endPos.y} ${endPos.x} ${endPos.y}`); }); };
+            const updateConnectionPreview = e => { const preview = document.getElementById('preview-line'); if (!preview || !connectionStart) return; const startPoint = getConnectionPointPosition(connectionStart.node, connectionStart.point), mousePos = getMousePositionOnCanvas(e); const dx = mousePos.x - startPoint.x, cpo = Math.max(Math.abs(dx) * 0.5, 50); preview.setAttribute('d', `M ${startPoint.x} ${startPoint.y} C ${startPoint.x + cpo} ${startPoint.y} ${mousePos.x - cpo} ${mousePos.y} ${mousePos.x} ${mousePos.y}`); };
+            const handleConnectionStart = e => {
+                e.preventDefault();
+                e.stopPropagation();
+                connecting = true;
+                connectionStart = {
+                    node: e.target.closest('.node'),
+                    point: e.target,
+                    type: e.target.dataset.type,
+                    label: e.target.dataset.label,
+                    index: e.target.dataset.index
+                };
+                const preview = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                preview.classList.add('connection-preview');
+                preview.id = 'preview-line';
+                connectionsSvg.appendChild(preview);
+
+                // Show connection suggestions
+                if (connectionStart.type === 'input') {
+                    showConnectionSuggestions(connectionStart.label, e.clientX, e.clientY);
+                }
+            };
+
+            const handleConnectionEnd = e => {
+                const preview = document.getElementById('preview-line');
+                if (preview) preview.remove();
+                hideConnectionSuggestions();
+
+                if (!connecting) return;
+
+                const endTarget = e.target;
+                if (endTarget?.classList.contains('connection-point')) {
+                    const targetNode = endTarget.closest('.node');
+                    const targetType = endTarget.dataset.type;
+                    const targetLabel = endTarget.dataset.label;
+                    const targetIndex = endTarget.dataset.index;
+
+                    // Enhanced connection validation
+                    if (isValidConnection(connectionStart, {
+                        node: targetNode,
+                        point: endTarget,
+                        type: targetType,
+                        label: targetLabel,
+                        index: targetIndex
+                    })) {
+                        const startIsOutput = connectionStart.type === 'output';
+                        createConnection(
+                            startIsOutput ? connectionStart : { node: targetNode, point: endTarget, type: targetType, label: targetLabel, index: targetIndex },
+                            startIsOutput ? { node: targetNode, point: endTarget, type: targetType, label: targetLabel, index: targetIndex } : connectionStart
+                        );
+                    }
+                }
+                connecting = false;
+                connectionStart = null;
+            };
+
+            const getCompatibleNodes = (connectionLabel) => {
+                const compatibilityMap = {
+                    'model': ['chatgpt', 'gemini', 'ollama'],
+                    'memory': ['buffer-memory', 'short-term-memory', 'long-term-memory', 'vector-memory'],
+                    'tools': ['web-tools', 'file-tools', 'code-tools'],
+                    'input': [] // All processing nodes can connect to input
+                };
+
+                return compatibilityMap[connectionLabel] || [];
+            };
+
+            const showConnectionSuggestions = (connectionLabel, x, y) => {
+                hideConnectionSuggestions();
+
+                const compatibleTypes = getCompatibleNodes(connectionLabel);
+                if (compatibleTypes.length === 0) return;
+
+                const suggestions = document.createElement('div');
+                suggestions.className = 'connection-suggestions';
+                suggestions.id = 'connection-suggestions';
+                suggestions.style.left = `${x}px`;
+                suggestions.style.top = `${y}px`;
+
+                // Add suggestion header
+                suggestions.innerHTML = `<div class="text-xs text-gray-400 mb-2 font-semibold">Connect ${connectionLabel.toUpperCase()}</div>`;
+
+                // Add compatible node suggestions
+                for (const [category, categoryData] of Object.entries(nodeLibrary)) {
+                    for (const [nodeType, nodeData] of Object.entries(categoryData.nodes)) {
+                        if (compatibleTypes.includes(nodeType)) {
+                            const item = document.createElement('div');
+                            item.className = 'suggestion-item';
+                            item.innerHTML = `<i class="fas ${nodeData.icon}"></i>${nodeData.name}`;
+                            item.onclick = () => createSuggestedNode(nodeType, connectionLabel);
+                            suggestions.appendChild(item);
+                        }
+                    }
+                }
+
+                document.body.appendChild(suggestions);
+            };
+
+            const hideConnectionSuggestions = () => {
+                const suggestions = document.getElementById('connection-suggestions');
+                if (suggestions) suggestions.remove();
+            };
+
+            const createSuggestedNode = (nodeType, connectionLabel) => {
+                const mousePos = { x: 200, y: 200 }; // Default position, can be improved
+                addNode(nodeType, null, mousePos, true);
+                hideConnectionSuggestions();
+
+                // Auto-connect after a brief delay to let the node render
+                setTimeout(() => {
+                    const newNodes = canvas.querySelectorAll('.node');
+                    const newestNode = newNodes[newNodes.length - 1];
+                    const outputPoint = newestNode.querySelector('.connection-point.output');
+
+                    if (outputPoint && connectionStart) {
+                        createConnection(
+                            { node: newestNode, point: outputPoint, type: 'output', label: connectionLabel, index: '0' },
+                            connectionStart
+                        );
+                    }
+                }, 100);
+            };
+
+            const isValidConnection = (start, end) => {
+                // Can't connect to same node
+                if (start.node === end.node) return false;
+
+                // Can't connect same types (input to input, output to output)
+                if (start.type === end.type) return false;
+
+                // Check compatibility for specialized connections
+                if (start.label && end.label && start.label !== end.label) {
+                    // Allow model connections
+                    if ((start.label === 'model' && end.label === 'model') ||
+                        (start.label === 'memory' && end.label === 'memory') ||
+                        (start.label === 'tools' && end.label === 'tools')) {
+                        // These are valid
+                    } else if (start.label !== end.label &&
+                               !['input', 'output'].includes(start.label) &&
+                               !['input', 'output'].includes(end.label)) {
+                        return false; // Incompatible specialized connections
+                    }
+                }
+
+                // Check if connection already exists
+                const existingConnection = connections.find(conn =>
+                    conn.start.node === (start.type === 'output' ? start.node : end.node) &&
+                    conn.end.node === (start.type === 'output' ? end.node : start.node) &&
+                    conn.start.index === (start.type === 'output' ? start.index : end.index) &&
+                    conn.end.index === (start.type === 'output' ? end.index : start.index)
+                );
+                if (existingConnection) return false;
+
+                return true;
+            };
+            function setupNodeEvents(node) { let isDragging = false, startPos = { x: 0, y: 0 }, initialPositions = new Map(); node.addEventListener('mousedown', e => { if (e.target.classList.contains('connection-point')) return; isDragging = true; startPos = { x: e.clientX, y: e.clientY }; if (!e.ctrlKey && !e.metaKey && !node.classList.contains('selected')) { clearSelection(); } node.classList.add('selected'); selectedItems.add(node); activeNode = node; selectedItems.forEach(item => { if (item.classList.contains('node')) { item.style.zIndex = ++highestZ; initialPositions.set(item, { left: item.offsetLeft, top: item.offsetTop }); } }); e.preventDefault(); e.stopPropagation(); }); document.addEventListener('mousemove', e => { if (isDragging) { const dX = (e.clientX - startPos.x) / canvasTransform.scale, dY = (e.clientY - startPos.y) / canvasTransform.scale; selectedItems.forEach(item => { if (item.classList.contains('node')) { const initPos = initialPositions.get(item); item.style.left = `${Math.max(0, initPos.left + dX)}px`; item.style.top = `${Math.max(0, initPos.top + dY)}px`; } }); updateConnections(); } else if (connecting) { updateConnectionPreview(e); } }); document.addEventListener('mouseup', e => { if(isDragging) { isDragging = false; const moved = Math.abs(e.clientX - startPos.x) < 3 && Math.abs(e.clientY - startPos.y) < 3; if (moved) showNodeInfo(node); } }); node.querySelectorAll('.connection-point').forEach(p => p.addEventListener('mousedown', handleConnectionStart)); }
+
+            // --- MODAL & CONFIRMATION ---
+            window.showConfirmationModal = (message, onConfirm) => { modalMessage.textContent = message; confirmCallback = onConfirm; confirmationModal.classList.remove('hidden'); };
+            const hideConfirmationModal = () => { confirmationModal.classList.add('hidden'); confirmCallback = null; };
+            modalConfirmBtn.addEventListener('click', () => { if (confirmCallback) confirmCallback(); hideConfirmationModal(); });
+            modalCancelBtn.addEventListener('click', hideConfirmationModal);
+            window.confirmDeleteSelected = () => { if (selectedItems.size === 0) return alert('No items selected.'); showConfirmationModal(`Are you sure you want to delete ${selectedItems.size} selected item(s)?`, deleteSelected); };
+
+            // --- UI & INSPECTOR ---
+            const renderNodeLibrary = () => { const container = document.getElementById('node-categories'); container.innerHTML = ''; for (const [key, cat] of Object.entries(nodeLibrary)) { const catDiv = document.createElement('div'); catDiv.className = 'node-category'; catDiv.innerHTML = `<div class="p-3 border-b border-gray-600 flex items-center justify-between cursor-pointer" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.querySelector('i.fa-chevron-down').classList.toggle('rotate-[-90deg]');"><div class="flex items-center"><i class="fas ${cat.icon} mr-2 text-blue-400"></i><span class="font-medium text-sm">${cat.name}</span></div><i class="fas fa-chevron-down transform transition-transform"></i></div><div class="category-nodes p-2">${Object.entries(cat.nodes).map(([nk, n]) => `<div class="draggable-node p-2 mb-2 flex items-center" draggable="true" data-type="${nk}"><i class="fas ${n.icon} mr-2 text-sm"></i><div class="flex-grow"><div class="text-sm font-medium">${n.name}</div><div class="text-xs text-gray-400">${n.description}</div></div></div>`).join('')}</div>`; container.appendChild(catDiv); } document.querySelectorAll('.draggable-node').forEach(el => el.addEventListener('dragstart', e => e.dataTransfer.setData('node-type', e.target.dataset.type))); };
+            const countConnections = () => connections.length;
+            const showDefaultInspector = () => { inspectorContent.innerHTML = `<div class="text-center p-8"><i class="fas fa-mouse-pointer text-4xl text-gray-400 mb-4"></i><p class="text-gray-400 mb-4">Select a node to view its properties</p><div class="grid grid-cols-2 gap-2 text-sm"><div class="bg-gray-800 p-2 rounded"><div class="text-gray-400">Total Nodes</div><div class="text-lg font-bold">${canvas.querySelectorAll('.node').length}</div></div><div class="bg-gray-800 p-2 rounded"><div class="text-gray-400">Connections</div><div class="text-lg font-bold">${countConnections()}</div></div></div></div>`; if (monacoInstance) { monacoInstance.dispose(); monacoInstance = null; } };
+            window.switchTab = (el, tabName) => { currentInspectorTab = tabName; document.querySelectorAll('#inspector-tabs .tab').forEach(t => t.classList.remove('active')); el.classList.add('active'); if (activeNode) showNodeInfo(activeNode); };
+            window.switchExecutionTab = (el, tabName) => {
+                document.querySelectorAll('#execution-tabs .tab').forEach(t => t.classList.remove('active'));
+                el.classList.add('active');
+                const logs = document.getElementById('execution-logs-container');
+                const timeline = document.getElementById('execution-timeline-container');
+                const nodes = document.getElementById('node-outputs-container');
+                const chat = document.getElementById('chat-container');
+                logs.classList.toggle('hidden', tabName !== 'logs');
+                timeline.classList.toggle('hidden', tabName !== 'timeline');
+                nodes.classList.toggle('hidden', tabName !== 'nodes');
+                chat.classList.toggle('hidden', tabName !== 'chat');
+            };
+
+            window.handleChatKeyPress = (event) => {
+                if (event.key === 'Enter') {
+                    sendChatMessage();
+                }
+            };
+
+            window.sendChatMessage = () => {
+                const chatInput = document.getElementById('chat-input');
+                const message = chatInput.value.trim();
+                if (!message) return;
+
+                // Add user message
+                addChatMessage('user', message);
+                chatInput.value = '';
+
+                // Debug: Log current configurations before triggering
+                console.log('Current node configurations before chat:', nodeConfigurations);
+
+                // Trigger workflow with chat message
+                triggerChatWorkflow(message);
+            };
+
+            const addChatMessage = (sender, message, isBot = false) => {
+                const chatMessages = document.getElementById('chat-messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-message ${sender}`;
+
+                const senderClass = sender === 'user' ? 'bg-blue-600' : 'bg-gray-600';
+                const align = sender === 'user' ? 'ml-auto' : 'mr-auto';
+
+                // Escape HTML to show raw content including <think> tags
+                const escapeHtml = (text) => {
+                    const div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                };
+
+                messageDiv.innerHTML = `
+                    <div class="${senderClass} ${align} max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-white text-sm">
+                        <div class="font-semibold text-xs mb-1">${sender === 'user' ? 'You' : 'Bot'}</div>
+                        <div class="whitespace-pre-wrap">${escapeHtml(message)}</div>
+                    </div>
+                `;
+
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            };
+
+            const triggerChatWorkflow = async (message) => {
+                // Find chat trigger nodes
+                const chatNodes = Array.from(canvas.querySelectorAll('.node')).filter(node =>
+                    node.dataset.type === 'chat'
+                );
+
+                if (chatNodes.length === 0) {
+                    addChatMessage('system', 'No chat trigger node found. Please add a Chat Trigger node to your workflow.');
+                    return;
+                }
+
+                // Set the chat message as input data for the workflow
+                window.chatMessage = message;
+
+                // Run the workflow
+                try {
+                    const response = await fetch('http://127.0.0.1:5000/run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            drawflow: {
+                                home: {
+                                    nodes: createChatWorkflowData(message)
+                                }
+                            }
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        // Extract bot response from new AI agent format
+                        let botResponse = 'No response from workflow';
+
+                        // Check for chat-output node response (processed)
+                        if (data.result?.chat_response) {
+                            botResponse = data.result.chat_response;
+
+                            // Log thinking content if available
+                            if (data.result.thinking_content) {
+                                console.log('🧠 Thinking process:', data.result.thinking_content);
+                            }
+                        }
+                        // Check for new AI agent format (raw)
+                        else if (data.result?.raw_response) {
+                            botResponse = data.result.raw_response;
+                        }
+                        // Check for error in AI agent response
+                        else if (data.result?.error) {
+                            botResponse = `Error: ${data.result.error}`;
+                        }
+                        // Fallback to old format
+                        else if (data.result?.response?.result) {
+                            botResponse = data.result.response.result;
+                        }
+                        else if (data.result?.result) {
+                            botResponse = data.result.result;
+                        }
+
+                        // Show execution results in execution monitor
+                        if (data.all_results) {
+                            updateExecutionMonitor(data.all_results, data.execution_order);
+                        }
+
+                        // Show model info if available
+                        if (data.result?.model_info) {
+                            const modelInfo = data.result.model_info;
+                            console.log(`Used model: ${modelInfo.model} (${modelInfo.provider})`);
+                            console.log(`Capabilities:`, modelInfo.capabilities);
+                        }
+
+                        addChatMessage('bot', botResponse);
+                    } else {
+                        addChatMessage('system', `Error: ${data.error || 'Workflow execution failed'}`);
+                    }
+                } catch (error) {
+                    addChatMessage('system', `Connection error: ${error.message}`);
+                }
+            };
+
+            const createChatWorkflowData = (message) => {
+                const nodes = {};
+                const nodesOnCanvas = canvas.querySelectorAll('.node');
+
+                nodesOnCanvas.forEach(nodeEl => {
+                    const nodeType = nodeEl.dataset.type;
+                    const nodeData = getNodeData(nodeType);
+                    const nodeId = nodeEl.id.split('-')[1];
+
+                    const outputs = {};
+                    connections.filter(c => c.start.node === nodeEl).forEach((c, i) => {
+                        const endNodeId = c.end.node.id.split('-')[1];
+                        const outputKey = `output_${i+1}`;
+                        if (!outputs[outputKey]) outputs[outputKey] = { connections: [] };
+
+                        // Get the connection label from the connection's end property
+                        const connectionLabel = c.end.label || 'input';
+
+                        outputs[outputKey].connections.push({
+                            node: endNodeId,
+                            output: `input_1`,
+                            connection_label: connectionLabel
+                        });
+                    });
+
+                    // Include node configuration in data
+                    let nodeConfig = nodeConfigurations[nodeEl.id] || {};
+
+                    // If no config in memory, try to get from DOM
+                    if (Object.keys(nodeConfig).length === 0 && nodeEl.dataset.config) {
+                        try {
+                            nodeConfig = JSON.parse(nodeEl.dataset.config);
+                        } catch (e) {
+                            console.log('Failed to parse config from DOM:', e);
+                        }
+                    }
+
+                    // If still no config, provide default based on node type
+                    if (Object.keys(nodeConfig).length === 0) {
+                        if (nodeType === 'ollama') {
+                            nodeConfig = { model: '', url: 'http://localhost:11434' };
+                        } else if (nodeType === 'buffer-memory') {
+                            nodeConfig = { max_tokens: 4000, system_prompt: '' };
+                        } else if (nodeType === 'chatgpt') {
+                            nodeConfig = { model: 'gpt-4', api_key: '' };
+                        } else if (nodeType === 'ai-agent') {
+                            nodeConfig = { system_prompt: '', model: 'auto' };
+                        }
+                        console.log(`Applied default config for ${nodeType}:`, nodeConfig);
+                    }
+
+                    console.log(`Node ${nodeId} config:`, nodeConfig);
+
+                    nodes[nodeId] = {
+                        id: nodeId,
+                        name: nodeType,
+                        data: {
+                            type: nodeType,
+                            chat_message: nodeType === 'chat' ? message : undefined,
+                            config: nodeConfig
+                        },
+                        class: nodeType,
+                        html: `<div>${nodeData.description}</div>`,
+                        typenode: 'vue',
+                        pos_x: nodeEl.offsetLeft,
+                        pos_y: nodeEl.offsetTop,
+                        inputs: {},
+                        outputs
+                    };
+                });
+
+                return nodes;
+            };
+
+            const detectModelCapabilities = (modelName) => {
+                const name = modelName.toLowerCase();
+                const capabilities = {
+                    thinking: false,
+                    toolCalling: false,
+                    vision: false,
+                    coding: false,
+                    reasoning: false,
+                    multimodal: false
+                };
+
+                // Detect thinking capability (models with built-in reasoning)
+                if (name.includes('qwq') || name.includes('deepseek-r1') || name.includes('o1') ||
+                    name.includes('think') || name.includes('reasoning')) {
+                    capabilities.thinking = true;
+                    capabilities.reasoning = true;
+                }
+
+                // Detect tool calling capability
+                if (name.includes('llama') || name.includes('mistral') || name.includes('qwen') ||
+                    name.includes('deepseek') || name.includes('codestral')) {
+                    capabilities.toolCalling = true;
+                }
+
+                // Detect vision capability
+                if (name.includes('vision') || name.includes('llava') || name.includes('minicpm') ||
+                    name.includes('qwen-vl') || name.includes('phi-3-vision')) {
+                    capabilities.vision = true;
+                    capabilities.multimodal = true;
+                }
+
+                // Detect coding capability
+                if (name.includes('code') || name.includes('deepseek-coder') || name.includes('codestral') ||
+                    name.includes('starcoder') || name.includes('granite-code')) {
+                    capabilities.coding = true;
+                }
+
+                return capabilities;
+            };
+
+            const showModelInfo = (modelName, capabilities, infoElement) => {
+                const capList = [];
+                if (capabilities.thinking) capList.push('🧠 Thinking');
+                if (capabilities.toolCalling) capList.push('🔧 Tool Calling');
+                if (capabilities.vision) capList.push('👁️ Vision');
+                if (capabilities.coding) capList.push('💻 Coding');
+                if (capabilities.reasoning) capList.push('🤔 Reasoning');
+                if (capabilities.multimodal) capList.push('🎯 Multimodal');
+
+                infoElement.innerHTML = capList.length > 0 ?
+                    `<strong>Capabilities:</strong><br>${capList.join('<br>')}` :
+                    'Standard text generation model';
+            };
+
+            window.fetchOllamaModels = async (preserveSelection = true) => {
+                const modelSelect = document.getElementById('ollama-model-select');
+                const modelInfo = document.getElementById('model-info');
+
+                if (!modelSelect) return;
+
+                const currentValue = preserveSelection ? modelSelect.value : null;
+                modelSelect.innerHTML = '<option value="">Loading models...</option>';
+                if (modelInfo) modelInfo.innerHTML = '';
+
+                try {
+                    // Try backend endpoint first, fallback to direct Ollama
+                    let response;
+                    try {
+                        response = await fetch('http://127.0.0.1:5000/ollama/models');
+                    } catch {
+                        const ollamaUrl = document.getElementById('ollama-url')?.value || 'http://localhost:11434';
+                        response = await fetch(`${ollamaUrl}/api/tags`);
+                    }
+
+                    const data = await response.json();
+                    modelSelect.innerHTML = '<option value="">Select a model...</option>';
+
+                    if (data.models && data.models.length > 0) {
+                        let hasCurrentValue = false;
+                        const modelCapabilities = {}; // Store model capabilities
+
+                        data.models.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.name;
+                            const size = model.size ? ` (${Math.round(model.size / 1024 / 1024 / 1024 * 10) / 10}GB)` : '';
+                            option.textContent = `${model.name}${size}`;
+
+                            // Detect model capabilities based on model name/family
+                            const capabilities = detectModelCapabilities(model.name);
+                            modelCapabilities[model.name] = capabilities;
+                            option.dataset.capabilities = JSON.stringify(capabilities);
+
+                            if (currentValue && model.name === currentValue) {
+                                option.selected = true;
+                                hasCurrentValue = true;
+                                if (modelInfo) {
+                                    showModelInfo(model.name, capabilities, modelInfo);
+                                }
+                            }
+                            modelSelect.appendChild(option);
+                        });
+
+                        // Add event listener for model selection change
+                        modelSelect.addEventListener('change', function() {
+                            const selectedModel = this.value;
+                            if (selectedModel && modelInfo) {
+                                const capabilities = modelCapabilities[selectedModel];
+                                showModelInfo(selectedModel, capabilities, modelInfo);
+                            } else if (modelInfo) {
+                                modelInfo.innerHTML = '';
+                            }
+                        });
+
+                        // If preserved value doesn't exist, add it as an option
+                        if (currentValue && !hasCurrentValue && preserveSelection) {
+                            const option = document.createElement('option');
+                            option.value = currentValue;
+                            option.textContent = `${currentValue} (saved)`;
+                            option.selected = true;
+                            modelSelect.insertBefore(option, modelSelect.firstChild);
+                        }
+                    } else {
+                        const option = document.createElement('option');
+                        const defaultValue = currentValue || 'qwen3:8b';
+                        option.value = defaultValue;
+                        option.textContent = `${defaultValue} (default)`;
+                        option.selected = true;
+                        modelSelect.appendChild(option);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch Ollama models:', error);
+                    const option = document.createElement('option');
+                    const fallbackValue = currentValue || 'qwen3:8b';
+                    option.value = fallbackValue;
+                    option.textContent = `${fallbackValue} (connection failed)`;
+                    option.selected = true;
+                    modelSelect.appendChild(option);
+                }
+            };
+
+            // --- ADVANCED INSPECTOR & IDE ---
+            function showNodeInfo(node) {
+                const nodeType = node.dataset.type, nodeData = getNodeData(nodeType);
+                if (!nodeData) return;
+
+                const nodeId = node.id;
+                let nodeConfig = nodeConfigurations[nodeId] || {};
+
+                // If no config exists but node has data attributes, try to extract config
+                if (Object.keys(nodeConfig).length === 0) {
+                    const nodeEl = document.getElementById(nodeId);
+                    if (nodeEl && nodeEl.dataset.config) {
+                        try {
+                            nodeConfig = JSON.parse(nodeEl.dataset.config);
+                            nodeConfigurations[nodeId] = nodeConfig;
+                        } catch (e) {
+                            console.log('Failed to parse node config from dataset:', e);
+                        }
+                    }
+                }
+
+                let contentHtml = '';
+                switch (currentInspectorTab) {
+                    case 'code':
+                        contentHtml = `<div class="space-y-4"><h3 class="font-bold text-lg">Node Code</h3><div class="bg-gray-800 p-3 rounded-lg"><div id="monaco-editor-small" style="height: 300px;"></div></div></div>`;
+                        break;
+                    case 'docs':
+                        contentHtml = `<div class="space-y-4"><h3 class="font-bold text-lg">Documentation</h3><div class="bg-gray-800 p-4 rounded-lg"><h4 class="font-semibold mb-2">${nodeData.name}</h4><p class="text-sm text-gray-300">${nodeData.description}</p></div></div>`;
+                        break;
+                    default: // properties
+                        // Show connection points info
+                        let connectionPointsInfo = '';
+                        if (nodeData.connectionPoints) {
+                            connectionPointsInfo = `
+                                <div class="bg-gray-700 p-3 rounded-lg mb-3">
+                                    <h5 class="font-semibold mb-2">Connection Points</h5>
+                                    <div class="space-y-1 text-xs">
+                                        ${nodeData.connectionPoints.map(cp => `
+                                            <div class="flex justify-between items-center">
+                                                <div class="flex items-center">
+                                                    <div class="w-2 h-2 rounded-full mr-2" style="background-color: ${cp.type === 'input' ? 'var(--accent-green)' : cp.type === 'output' ? 'var(--accent-blue)' : cp.label === 'model' ? 'var(--accent-purple)' : cp.label === 'memory' ? 'var(--accent-yellow)' : 'var(--accent-red)'}"></div>
+                                                    <span>${cp.label}</span>
+                                                </div>
+                                                <span class="text-gray-400">${cp.type}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        // Generate configuration HTML with saved values
+                        let configContent = generateConfigHTML(nodeData, nodeConfig);
+
+                        const memoryCanvasBtn = nodeData.nodeType === 'memory' ? '<button onclick="showMemoryCanvas()" class="w-full btn btn-secondary"><i class="fas fa-project-diagram mr-2"></i>Memory Canvas</button>' : '';
+                        contentHtml = `<div class="space-y-4"><div class="bg-gray-800 p-4 rounded-lg"><div class="flex items-center mb-3"><i class="fas ${nodeData.icon} mr-2 text-blue-400"></i><h3 class="font-bold text-lg">${nodeData.name}</h3></div><p class="text-sm text-gray-400 mb-3">${nodeData.description}</p><div class="grid grid-cols-2 gap-2 text-xs"><div class="bg-gray-700 p-2 rounded text-center"><div class="text-gray-400">ID</div><div class="font-mono">${node.id.split('-')[1]}</div></div><div class="bg-gray-700 p-2 rounded text-center"><div class="text-gray-400">Type</div><div class="font-mono">${nodeData.nodeType || 'default'}</div></div></div></div>${connectionPointsInfo}<div class="bg-gray-800 p-4 rounded-lg"><h4 class="font-semibold mb-3">Configuration</h4><div id="node-config-container">${configContent}</div><button onclick="saveNodeConfig('${nodeId}')" class="btn btn-primary w-full mt-3"><i class="fas fa-save mr-2"></i>Save Configuration</button></div><div class="space-y-2"><button onclick="showIDEMode('${nodeType}')" class="w-full btn btn-secondary"><i class="fas fa-code mr-2"></i>Edit Code</button><button onclick="duplicateNode('${node.id}')" class="w-full btn btn-secondary"><i class="fas fa-copy mr-2"></i>Duplicate Node</button>${memoryCanvasBtn}<button onclick="confirmDeleteNode('${node.id}')" class="w-full btn btn-secondary text-red-400"><i class="fas fa-trash mr-2"></i>Delete Node</button></div></div>`;
+
+                        // Auto-fetch Ollama models if this is an Ollama node (preserve saved selection)
+                        if (nodeType === 'ollama') {
+                            setTimeout(() => fetchOllamaModels(true), 500);
+                        }
+                }
+                inspectorContent.innerHTML = contentHtml;
+                if (currentInspectorTab === 'code') setupMonacoEditor(nodeData.code, 'monaco-editor-small');
+            }
+            window.showIDEMode = (nodeType = null) => {
+                const isNew = nodeType === null;
+                const nodeData = isNew ? {
+                    name: 'New Node',
+                    icon: 'fa-cube',
+                    code: pythonCodeTemplate,
+                    description: 'Custom node',
+                    nodeType: 'processing',
+                    connectionPoints: [{ type: 'input', position: 'left', label: 'input' }, { type: 'output', position: 'right', label: 'output' }]
+                } : getNodeData(nodeType);
+
+                activeNode = null;
+
+                // Connection points management HTML
+                const connectionPointsHTML = `
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-3">Connection Points</h4>
+                        <div id="connection-points-container">
+                            ${(nodeData.connectionPoints || []).map((cp, index) => `
+                                <div class="connection-point-editor flex items-center space-x-2 mb-2 p-2 bg-gray-700 rounded" data-index="${index}">
+                                    <select class="cp-type">
+                                        <option value="input" ${cp.type === 'input' ? 'selected' : ''}>Input</option>
+                                        <option value="output" ${cp.type === 'output' ? 'selected' : ''}>Output</option>
+                                    </select>
+                                    <select class="cp-position">
+                                        <option value="left" ${cp.position === 'left' ? 'selected' : ''}>Left</option>
+                                        <option value="right" ${cp.position === 'right' ? 'selected' : ''}>Right</option>
+                                        <option value="top" ${cp.position === 'top' ? 'selected' : ''}>Top</option>
+                                        <option value="bottom" ${cp.position === 'bottom' ? 'selected' : ''}>Bottom</option>
+                                        <option value="left-top" ${cp.position === 'left-top' ? 'selected' : ''}>Left Top</option>
+                                        <option value="left-bottom" ${cp.position === 'left-bottom' ? 'selected' : ''}>Left Bottom</option>
+                                        <option value="right-top" ${cp.position === 'right-top' ? 'selected' : ''}>Right Top</option>
+                                        <option value="right-bottom" ${cp.position === 'right-bottom' ? 'selected' : ''}>Right Bottom</option>
+                                    </select>
+                                    <input type="text" class="cp-label flex-grow" value="${cp.label}" placeholder="Label">
+                                    <button onclick="removeConnectionPoint(${index})" class="btn btn-secondary py-1 px-2 text-xs"><i class="fas fa-trash"></i></button>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button onclick="addConnectionPoint()" class="btn btn-secondary mt-2"><i class="fas fa-plus mr-1"></i>Add Connection Point</button>
+                    </div>
+                `;
+
+                inspectorContent.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-lg font-semibold">${isNew ? 'Create New Node' : 'Edit: ' + nodeData.name}</h2>
+                            <button onclick="mainInit(true)" class="btn btn-secondary py-1 px-3 text-sm"><i class="fas fa-times mr-1"></i>Close</button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="block text-sm">Node Name</label><input type="text" id="node-name" value="${nodeData.name}" class="w-full"></div>
+                            <div><label class="block text-sm">Icon (FontAwesome)</label><input type="text" id="node-icon" value="${nodeData.icon}" class="w-full"></div>
+                        </div>
+
+                        <div><label class="block text-sm">Description</label><input type="text" id="node-description" value="${nodeData.description}" class="w-full"></div>
+
+                        <div><label class="block text-sm">Node Type</label>
+                            <select id="node-type" class="w-full">
+                                <option value="trigger" ${nodeData.nodeType === 'trigger' ? 'selected' : ''}>Trigger</option>
+                                <option value="processing" ${nodeData.nodeType === 'processing' ? 'selected' : ''}>Processing</option>
+                                <option value="agent" ${nodeData.nodeType === 'agent' ? 'selected' : ''}>Agent</option>
+                                <option value="system" ${nodeData.nodeType === 'system' ? 'selected' : ''}>System</option>
+                                <option value="output" ${nodeData.nodeType === 'output' ? 'selected' : ''}>Output</option>
+                            </select>
+                        </div>
+
+                        ${connectionPointsHTML}
+
+                        <div><label class="block text-sm mb-1">Python Code</label>
+                            <div class="border border-gray-600 rounded-lg overflow-hidden">
+                                <div id="monaco-editor-ide" style="height: 300px;"></div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <h4 class="font-semibold mb-3"><i class="fas fa-vial mr-2 text-green-400"></i>Test & Debug</h4>
+                            <textarea id="test-input" rows="3" class="w-full font-mono text-sm" placeholder="Test Input (JSON)">{\n  "query": "test"\n}</textarea>
+                            <button id="run-test-btn" class="w-full btn btn-primary my-2"><i class="fas fa-play mr-2"></i>Run Test</button>
+                            <pre id="test-output" class="bg-black text-green-400 p-2 rounded h-24 overflow-y-auto text-xs scrollbar-thin"></pre>
+                        </div>
+
+                        <button id="save-node-btn" class="w-full btn btn-success py-3"><i class="fas fa-save mr-2"></i>${isNew ? 'Create Node' : 'Update Node'}</button>
+                    </div>
+                `;
+
+                setupMonacoEditor(nodeData.code, 'monaco-editor-ide');
+                document.getElementById('run-test-btn').onclick = runTest;
+                document.getElementById('save-node-btn').onclick = () => saveNode(nodeType);
+            };
+            const setupMonacoEditor = (code, containerId) => { if (monacoInstance) { monacoInstance.dispose(); monacoInstance = null; } if (!window.require) return; require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs' }}); window.MonacoEnvironment = { getWorkerUrl: () => `data:text/javascript;charset=utf-8,${encodeURIComponent(`self.MonacoEnvironment={baseUrl:'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/'};importScripts('https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/base/worker/workerMain.js');`)}` }; require(["vs/editor/editor.main"], () => { monacoInstance = monaco.editor.create(document.getElementById(containerId), { value: code, language: 'python', theme: 'vs-dark', automaticLayout: true, fontSize: 13, minimap: { enabled: false } }); }); };
+            const runTest = () => {
+                if (!monacoInstance) return;
+                const code = monacoInstance.getValue();
+                const inputJson = document.getElementById('test-input').value;
+                const testOutput = document.getElementById('test-output');
+
+                try {
+                    const inputData = JSON.parse(inputJson);
+                    let logs = [];
+                    const customPrint = (...args) => logs.push(args.join(' '));
+
+                    // Add helper functions to execution scope
+                    const funcBody = code.replace(/console_log/g, 'customPrint').replace(/print/g, 'customPrint');
+
+                    // Create execution function with proper scope
+                    const executionScope = {
+                        console_log: customPrint,
+                        call_llm_agent: (prompt, model_config, memory_config, tools_config) => {
+                            customPrint(`[MOCK] LLM call: ${prompt}`);
+                            return { result: "Mock LLM response for testing" };
+                        },
+                        setup_memory_system: (config) => {
+                            customPrint(`[MOCK] Memory setup: ${JSON.stringify(config)}`);
+                            return { status: "created", type: config.type };
+                        },
+                        get_available_tools: (config) => {
+                            customPrint(`[MOCK] Tools available: ${JSON.stringify(config.tools || [])}`);
+                            return config.tools || [];
+                        },
+                        time: { time: () => Date.now() / 1000 },
+                        json: JSON,
+                        requests: {
+                            get: (url) => {
+                                customPrint(`[MOCK] HTTP GET: ${url}`);
+                                return { status_code: 200, json: () => ({ models: [{ name: "mock-model", size: 1000000000 }] }) };
+                            }
+                        }
+                    };
+
+                    const result = new Function('inputData', 'customPrint', 'console_log', 'call_llm_agent', 'setup_memory_system', 'get_available_tools', 'time', 'json', 'requests', `${funcBody} return execute(inputData);`)(
+                        inputData,
+                        customPrint,
+                        customPrint,
+                        executionScope.call_llm_agent,
+                        executionScope.setup_memory_system,
+                        executionScope.get_available_tools,
+                        executionScope.time,
+                        executionScope.json,
+                        executionScope.requests
+                    );
+
+                    testOutput.textContent = `LOGS:\n${logs.join('\n')}\n\nOUTPUT:\n${JSON.stringify(result, null, 2)}`;
+                    testOutput.classList.remove('text-red-400');
+                    testOutput.classList.add('text-green-400');
+                } catch (e) {
+                    testOutput.textContent = `ERROR: ${e.message}\n\nStack: ${e.stack}`;
+                    testOutput.classList.remove('text-green-400');
+                    testOutput.classList.add('text-red-400');
+                }
+            };
+            window.addConnectionPoint = () => {
+                const container = document.getElementById('connection-points-container');
+                const index = container.children.length;
+                const newPointHTML = `
+                    <div class="connection-point-editor flex items-center space-x-2 mb-2 p-2 bg-gray-700 rounded" data-index="${index}">
+                        <select class="cp-type">
+                            <option value="input">Input</option>
+                            <option value="output">Output</option>
+                        </select>
+                        <select class="cp-position">
+                            <option value="left">Left</option>
+                            <option value="right">Right</option>
+                            <option value="top">Top</option>
+                            <option value="bottom">Bottom</option>
+                            <option value="left-top">Left Top</option>
+                            <option value="left-bottom">Left Bottom</option>
+                            <option value="right-top">Right Top</option>
+                            <option value="right-bottom">Right Bottom</option>
+                        </select>
+                        <input type="text" class="cp-label flex-grow" value="connection" placeholder="Label">
+                        <button onclick="removeConnectionPoint(${index})" class="btn btn-secondary py-1 px-2 text-xs"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', newPointHTML);
+            };
+
+            window.removeConnectionPoint = (index) => {
+                const container = document.getElementById('connection-points-container');
+                const pointElement = container.querySelector(`[data-index="${index}"]`);
+                if (pointElement) pointElement.remove();
+            };
+
+            const saveNode = (originalKey) => {
+                const name = document.getElementById('node-name').value;
+                const icon = document.getElementById('node-icon').value;
+                const description = document.getElementById('node-description').value;
+                const nodeType = document.getElementById('node-type').value;
+                const code = monacoInstance ? monacoInstance.getValue() : '';
+
+                // Collect connection points
+                const connectionPoints = [];
+                const cpEditors = document.querySelectorAll('.connection-point-editor');
+                cpEditors.forEach(editor => {
+                    const type = editor.querySelector('.cp-type').value;
+                    const position = editor.querySelector('.cp-position').value;
+                    const label = editor.querySelector('.cp-label').value;
+                    connectionPoints.push({ type, position, label });
+                });
+
+                if (!name || !icon || !code) return alert("Please fill all fields.");
+
+                const newKey = name.toLowerCase().replace(/\s+/g, '-');
+                if (!nodeLibrary['custom']) {
+                    nodeLibrary['custom'] = { name: 'Custom Nodes', icon: 'fa-puzzle-piece', nodes: {} };
+                }
+
+                if (originalKey && originalKey !== newKey) {
+                    for (const cat of Object.values(nodeLibrary)) {
+                        if (cat.nodes[originalKey]) delete cat.nodes[originalKey];
+                    }
+                }
+
+                nodeLibrary['custom'].nodes[newKey] = {
+                    name,
+                    icon,
+                    description,
+                    nodeType,
+                    connectionPoints,
+                    code,
+                    content: `<p class="text-sm text-gray-300">${description}</p>`
+                };
+
+                renderNodeLibrary();
+                mainInit(true);
+            };
+
+            // --- MAIN FUNCTIONS & ACTIONS ---
+            window.confirmDeleteNode = (nodeId) => { showConfirmationModal('Are you sure you want to delete this node?', () => { deleteNode(nodeId); showDefaultInspector(); }); };
+            window.duplicateNode = (nodeId) => { const node = document.getElementById(nodeId); if (node) { const pos = { x: node.offsetLeft + 40, y: node.offsetTop + 40 }; const type = node.dataset.type; addNode(type, null, { x: pos.x, y: pos.y }, true); } };
+            function addNode(type, dropEvent = null, pos = {x: 150, y: 150}, isManual = false) {
+                const nodeData = getNodeData(type);
+                if (!nodeData) return;
+                nodeCount++;
+                const node = document.createElement('div');
+                node.className = `node node-${nodeData.nodeType || 'default'}`;
+                node.id = `node-${nodeCount}`;
+                node.dataset.type = type;
+
+                // Show chat tab if chat node is added
+                if (type === 'chat') {
+                    document.getElementById('chat-tab').style.display = 'block';
+                }
+
+                // Create connection points based on nodeData.connectionPoints
+                let connectionPointsHTML = '';
+                if (nodeData.connectionPoints) {
+                    nodeData.connectionPoints.forEach((cp, index) => {
+                        const pointClass = `connection-point ${cp.type} cp-${cp.position}`;
+                        const labelClass = `connection-point-label`;
+                        let labelPosition = '';
+
+                        // Position label relative to connection point
+                        if (cp.position.includes('left')) labelPosition = 'right: -5px; top: -20px;';
+                        else if (cp.position.includes('right')) labelPosition = 'left: -5px; top: -20px;';
+                        else if (cp.position.includes('top')) labelPosition = 'left: 50%; transform: translateX(-50%); bottom: -5px;';
+                        else if (cp.position.includes('bottom')) labelPosition = 'left: 50%; transform: translateX(-50%); top: -5px;';
+
+                        connectionPointsHTML += `
+                            <div class="${pointClass}" data-type="${cp.type}" data-label="${cp.label}" data-index="${index}">
+                                <div class="${labelClass}" style="${labelPosition}">${cp.label}</div>
+                            </div>
+                        `;
+                    });
+                }
+
+                node.innerHTML = `
+                    <div class="node-header">
+                        <div class="node-title"><i class="fas ${nodeData.icon} mr-2"></i>${nodeData.name}</div>
+                    </div>
+                    <div class="node-description">${nodeData.description}</div>
+                    ${connectionPointsHTML}
+                `;
+
+                const rect = canvasContainer.getBoundingClientRect();
+                node.style.left = isManual ? `${pos.x}px` : `${(dropEvent.clientX - rect.left - canvasTransform.x) / canvasTransform.scale}px`;
+                node.style.top = isManual ? `${pos.y}px` : `${(dropEvent.clientY - rect.top - canvasTransform.y) / canvasTransform.scale}px`;
+                canvas.appendChild(node);
+                setupNodeEvents(node);
+            }
+            const addTimelineEntry = (message, type = 'info') => { const timeline = document.getElementById('execution-timeline-container'); const entry = document.createElement('div'); entry.className = 'timeline-item'; const colors = { info: 'text-blue-400', success: 'text-green-400', error: 'text-red-400' }; entry.innerHTML = `<div class="text-xs text-gray-400">${new Date().toLocaleTimeString()}</div><div class="${colors[type] || colors.info}">${message}</div>`; timeline.appendChild(entry); timeline.scrollTop = timeline.scrollHeight; };
+            const exportWorkflowData = () => {
+                const workflow = { drawflow: { home: { nodes: {} } } };
+                const nodesOnCanvas = canvas.querySelectorAll('.node');
+                nodesOnCanvas.forEach(nodeEl => {
+                    const nodeType = nodeEl.dataset.type, nodeData = getNodeData(nodeType);
+                    const nodeId = nodeEl.id.split('-')[1];
+                    let nodeConfig = nodeConfigurations[nodeEl.id] || {};
+
+                    // If no config in memory, try to get from DOM
+                    if (Object.keys(nodeConfig).length === 0 && nodeEl.dataset.config) {
+                        try {
+                            nodeConfig = JSON.parse(nodeEl.dataset.config);
+                            console.log(`Restored config for ${nodeEl.id} from DOM:`, nodeConfig);
+                        } catch (e) {
+                            console.log('Failed to parse config from DOM in export:', e);
+                        }
+                    }
+
+                    // If still no config, provide default based on node type
+                    if (Object.keys(nodeConfig).length === 0) {
+                        if (nodeType === 'ollama') {
+                            nodeConfig = { model: '', url: 'http://localhost:11434' };
+                        } else if (nodeType === 'buffer-memory') {
+                            nodeConfig = { max_tokens: 4000, system_prompt: '' };
+                        } else if (nodeType === 'chatgpt') {
+                            nodeConfig = { model: 'gpt-4', api_key: '' };
+                        } else if (nodeType === 'ai-agent') {
+                            nodeConfig = { system_prompt: '', model: 'auto' };
+                        }
+                        console.log(`Applied default config for ${nodeType}:`, nodeConfig);
+                    }
+
+                    const outputs = {};
+                    connections.filter(c => c.start.node === nodeEl).forEach((c, i) => {
+                        const endNodeId = c.end.node.id.split('-')[1];
+                        const outputKey = `output_${i+1}`;
+                        if (!outputs[outputKey]) outputs[outputKey] = { connections: [] };
+
+                        // Get the connection label from the connection's end property
+                        const connectionLabel = c.end.label || 'input';
+
+                        outputs[outputKey].connections.push({
+                            node: endNodeId,
+                            output: `input_1`,
+                            connection_label: connectionLabel
+                        });
+
+                        console.log(`Connection: ${nodeEl.id} -> ${c.end.node.id} (${connectionLabel})`);
+                    });
+
+                    workflow.drawflow.home.nodes[nodeId] = {
+                        id: nodeId,
+                        name: nodeType,
+                        data: {
+                            type: nodeType,
+                            config: nodeConfig
+                        },
+                        class: nodeType,
+                        html: `<div>${nodeData.description}</div>`,
+                        typenode: 'vue',
+                        pos_x: nodeEl.offsetLeft,
+                        pos_y: nodeEl.offsetTop,
+                        inputs: {},
+                        outputs
+                    };
+                });
+                return workflow;
+            };
+            window.runWorkflow = async () => {
+                const runBtn = document.getElementById('run-workflow-btn');
+                const logsEl = document.getElementById('execution-logs-container');
+                const resultEl = document.getElementById('execution-result');
+
+                runBtn.disabled = true;
+                runBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Executing...';
+                logsEl.textContent = 'Initializing...';
+                resultEl.textContent = '';
+
+                // Clear previous node outputs
+                const nodeOutputs = document.getElementById('node-outputs-container');
+                if (nodeOutputs) nodeOutputs.innerHTML = '';
+
+                document.querySelector('.status-indicator').className = 'status-indicator status-running';
+                document.querySelector('.status-indicator + span').textContent = 'Running';
+                addTimelineEntry('Workflow started', 'info');
+
+                const startTime = Date.now();
+                try {
+                    const response = await fetch('http://127.0.0.1:5000/run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(exportWorkflowData().drawflow)
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error || `HTTP error!`);
+
+                    logsEl.textContent = data.logs;
+                    resultEl.textContent = JSON.stringify(data.result, null, 2);
+
+                    // Update execution monitor with node outputs
+                    if (data.all_results && data.execution_order) {
+                        updateExecutionMonitor(data.all_results, data.execution_order);
+                    }
+
+                    document.getElementById('execution-time').textContent = `${Date.now() - startTime}ms`;
+                    document.getElementById('nodes-processed').textContent = Object.keys(exportWorkflowData().drawflow.home.nodes).length;
+                    document.querySelector('.status-indicator').className = 'status-indicator status-success';
+                    document.querySelector('.status-indicator + span').textContent = 'Completed';
+                    addTimelineEntry('Workflow completed successfully', 'success');
+
+                } catch (error) {
+                    logsEl.textContent = `Error: ${error.message}\n\nPlease ensure the Python backend is running.`;
+                    document.querySelector('.status-indicator').className = 'status-indicator status-error';
+                    document.querySelector('.status-indicator + span').textContent = 'Error';
+                    addTimelineEntry(`Error: ${error.message}`, 'error');
+                } finally {
+                    runBtn.disabled = false;
+                    runBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Execute Workflow';
+                }
+            };
+            window.clearLogs = () => {
+                document.getElementById('execution-logs-container').textContent = '';
+                document.getElementById('execution-timeline-container').innerHTML = '';
+                document.getElementById('execution-result').textContent = '';
+                document.getElementById('execution-time').textContent = '--';
+                document.getElementById('nodes-processed').textContent = '0';
+                const nodeOutputs = document.getElementById('node-outputs-container');
+                if (nodeOutputs) nodeOutputs.innerHTML = '<div class="text-sm text-gray-400">Execute workflow to see node outputs...</div>';
+            };
+
+            const updateExecutionMonitor = (allResults, executionOrder) => {
+                const nodeOutputsContainer = document.getElementById('node-outputs-container');
+                if (!nodeOutputsContainer) return;
+
+                nodeOutputsContainer.innerHTML = '<h3 class="text-sm font-semibold mb-2 text-gray-300">Node Outputs</h3>';
+
+                // Show results in execution order
+                executionOrder.forEach(nodeId => {
+                    const result = allResults[nodeId];
+                    const nodeElement = document.getElementById(`node-${nodeId}`);
+                    const nodeType = nodeElement ? nodeElement.dataset.type : 'unknown';
+
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'mb-3 p-3 bg-gray-800 rounded border-l-4 border-blue-500';
+
+                    // Node header
+                    const header = document.createElement('div');
+                    header.className = 'flex items-center justify-between mb-2';
+                    header.innerHTML = `
+                        <div class="text-sm font-medium text-blue-400">Node ${nodeId} (${nodeType})</div>
+                        <div class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</div>
+                    `;
+
+                    // Result content
+                    const content = document.createElement('div');
+                    content.className = 'text-xs';
+
+                    if (result && typeof result === 'object') {
+                        // Highlight important fields
+                        const importantFields = ['chat_response', 'raw_response', 'thinking_content', 'model_used', 'error'];
+                        let displayHtml = '';
+
+                        importantFields.forEach(field => {
+                            if (result[field] !== undefined) {
+                                const value = typeof result[field] === 'string' ? result[field] : JSON.stringify(result[field]);
+                                const truncated = value.length > 100 ? value.substring(0, 100) + '...' : value;
+                                displayHtml += `<div class="mb-1"><span class="text-yellow-400">${field}:</span> <span class="text-gray-300">${truncated}</span></div>`;
+                            }
+                        });
+
+                        // Show full result in collapsed format
+                        displayHtml += `<details class="mt-2"><summary class="text-gray-400 cursor-pointer">Full Output</summary><pre class="text-xs text-gray-400 mt-1 whitespace-pre-wrap">${JSON.stringify(result, null, 2)}</pre></details>`;
+                        content.innerHTML = displayHtml;
+                    } else {
+                        content.innerHTML = `<pre class="text-gray-300">${JSON.stringify(result, null, 2)}</pre>`;
+                    }
+
+                    resultDiv.appendChild(header);
+                    resultDiv.appendChild(content);
+                    nodeOutputsContainer.appendChild(resultDiv);
+                });
+            };
+
+            const generateConfigHTML = (nodeData, savedConfig) => {
+                let html = nodeData.content || '';
+
+                // Generate configuration UI based on node type
+                if (nodeData.nodeType === 'agent' && nodeData.name === 'AI Agent') {
+                    const savedPrompt = savedConfig.system_prompt || '';
+                    const savedModel = savedConfig.model || 'auto';
+                    html = `<div class="space-y-3">
+                        <div><label class="block text-sm mb-1">System Prompt</label>
+                        <textarea id="agent-system-prompt" placeholder="You are a helpful AI assistant..." class="w-full h-20">${savedPrompt}</textarea></div>
+                        <div><label class="block text-sm mb-1">Model Selection</label>
+                        <select id="agent-model" class="w-full">
+                            <option value="auto" ${savedModel === 'auto' ? 'selected' : ''}>Auto (from connected model node)</option>
+                            <option value="qwen3:8b" ${savedModel === 'qwen3:8b' ? 'selected' : ''}>Qwen3:8b</option>
+                            <option value="llama2:7b" ${savedModel === 'llama2:7b' ? 'selected' : ''}>Llama2:7b</option>
+                        </select></div>
+                    </div>`;
+                } else if (nodeData.nodeType === 'model' && nodeData.name === 'Ollama') {
+                    const savedModel = savedConfig.model || '';
+                    const savedUrl = savedConfig.url || 'http://localhost:11434';
+                    html = `<div class="space-y-2">
+                        <label class="block text-sm">Ollama Server URL</label>
+                        <input type="text" placeholder="http://localhost:11434" value="${savedUrl}" class="w-full" id="ollama-url">
+                        <label class="block text-sm">Available Models</label>
+                        <select id="ollama-model-select" class="w-full">
+                            <option value="">Select a model...</option>
+                            ${savedModel ? `<option value="${savedModel}" selected>${savedModel}</option>` : ''}
+                        </select>
+                        <button onclick="fetchOllamaModels(false)" class="btn btn-secondary w-full text-sm py-1">
+                            <i class="fas fa-sync mr-1"></i>Refresh Models
+                        </button>
+                        <div id="model-info" class="text-xs text-gray-400 mt-2"></div>
+                    </div>`;
+                } else if (nodeData.nodeType === 'model' && nodeData.name === 'ChatGPT') {
+                    const savedModel = savedConfig.model || 'gpt-4';
+                    const savedApiKey = savedConfig.api_key || '';
+                    html = `<select class="w-full mb-2" id="chatgpt-model"><option value="gpt-4" ${savedModel === 'gpt-4' ? 'selected' : ''}>gpt-4</option><option value="gpt-3.5-turbo" ${savedModel === 'gpt-3.5-turbo' ? 'selected' : ''}>gpt-3.5-turbo</option></select><input type="password" placeholder="API Key" value="${savedApiKey}" class="w-full" id="chatgpt-api-key">`;
+                } else if (nodeData.nodeType === 'trigger' && nodeData.name === 'Chat Trigger') {
+                    const savedTitle = savedConfig.title || 'My Chat Bot';
+                    const savedHistory = savedConfig.history || false;
+                    html = `<div class="space-y-2"><label class="block text-sm">Chat Title</label><input type="text" placeholder="My Chat Bot" value="${savedTitle}" class="w-full" id="chat-title"><label class="flex items-center mt-2"><input type="checkbox" class="mr-2" id="chat-history" ${savedHistory ? 'checked' : ''}>Enable Chat History</label></div>`;
+                } else if (nodeData.nodeType === 'memory') {
+                    if (nodeData.name === 'Buffer Memory') {
+                        const savedTokens = savedConfig.max_tokens || 4000;
+                        const savedPrompt = savedConfig.system_prompt || '';
+                        html = `<div class="space-y-2"><label class="block text-sm">Max Tokens</label><input type="number" value="${savedTokens}" class="w-full" id="buffer-max-tokens"><label class="block text-sm">System Prompt</label><textarea placeholder="System prompt..." class="w-full h-16" id="buffer-system-prompt">${savedPrompt}</textarea></div>`;
+                    }
+                }
+
+                return html;
+            };
+
+            window.saveNodeConfig = (nodeId) => {
+                const node = document.getElementById(nodeId);
+                if (!node) return;
+
+                const nodeType = node.dataset.type;
+                const nodeData = getNodeData(nodeType);
+                const config = {};
+
+                // Save configuration based on node type
+                if (nodeType === 'ai-agent') {
+                    const promptInput = document.getElementById('agent-system-prompt');
+                    const modelSelect = document.getElementById('agent-model');
+                    if (promptInput) config.system_prompt = promptInput.value;
+                    if (modelSelect) config.model = modelSelect.value;
+                } else if (nodeType === 'ollama') {
+                    const modelSelect = document.getElementById('ollama-model-select');
+                    const urlInput = document.getElementById('ollama-url');
+                    if (modelSelect) config.model = modelSelect.value;
+                    if (urlInput) config.url = urlInput.value;
+                } else if (nodeType === 'chatgpt') {
+                    const modelSelect = document.getElementById('chatgpt-model');
+                    const apiKeyInput = document.getElementById('chatgpt-api-key');
+                    if (modelSelect) config.model = modelSelect.value;
+                    if (apiKeyInput) config.api_key = apiKeyInput.value;
+                } else if (nodeType === 'chat') {
+                    const titleInput = document.getElementById('chat-title');
+                    const historyCheck = document.getElementById('chat-history');
+                    if (titleInput) config.title = titleInput.value;
+                    if (historyCheck) config.history = historyCheck.checked;
+                } else if (nodeType === 'buffer-memory') {
+                    const tokensInput = document.getElementById('buffer-max-tokens');
+                    const promptInput = document.getElementById('buffer-system-prompt');
+                    if (tokensInput) config.max_tokens = parseInt(tokensInput.value);
+                    if (promptInput) config.system_prompt = promptInput.value;
+                }
+
+                // Save to configurations and update node element
+                nodeConfigurations[nodeId] = config;
+
+                // Also store in node element for persistence
+                const nodeEl = document.getElementById(nodeId);
+                if (nodeEl) {
+                    nodeEl.dataset.config = JSON.stringify(config);
+                }
+
+                console.log(`Saved config for ${nodeId}:`, config);
+                console.log('All node configurations:', nodeConfigurations);
+
+                // Show success message
+                const btn = event.target;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check mr-2"></i>Saved!';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-success');
+
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-primary');
+                }, 1500);
+            };
+            window.saveWorkflow = () => alert('Save functionality not implemented yet.');
+            window.exportWorkflow = () => { const data = exportWorkflowData(); console.log('Exported workflow:', data); alert('Workflow exported to console.'); };
+            window.showMemoryCanvas = () => {
+                const memoryContent = `
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-lg font-semibold">Memory Canvas</h2>
+                            <button onclick="mainInit(true)" class="btn btn-secondary py-1 px-3 text-sm"><i class="fas fa-times mr-1"></i>Close</button>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <h3 class="font-semibold mb-3">Memory Visualization</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-gray-700 p-3 rounded">
+                                    <h4 class="font-medium mb-2 text-yellow-400">Short Term Memory</h4>
+                                    <div class="text-sm text-gray-300">Active conversations: 5</div>
+                                    <div class="text-sm text-gray-300">Memory usage: 2.3KB</div>
+                                    <div class="text-sm text-gray-300">TTL: 1 hour</div>
+                                </div>
+                                <div class="bg-gray-700 p-3 rounded">
+                                    <h4 class="font-medium mb-2 text-blue-400">Long Term Memory</h4>
+                                    <div class="text-sm text-gray-300">Stored memories: 127</div>
+                                    <div class="text-sm text-gray-300">Memory usage: 45.7KB</div>
+                                    <div class="text-sm text-gray-300">Storage: SQLite</div>
+                                </div>
+                                <div class="bg-gray-700 p-3 rounded">
+                                    <h4 class="font-medium mb-2 text-purple-400">Vector Memory</h4>
+                                    <div class="text-sm text-gray-300">Embeddings: 89</div>
+                                    <div class="text-sm text-gray-300">Dimensions: 384</div>
+                                    <div class="text-sm text-gray-300">Index: FAISS</div>
+                                </div>
+                                <div class="bg-gray-700 p-3 rounded">
+                                    <h4 class="font-medium mb-2 text-green-400">Buffer Memory</h4>
+                                    <div class="text-sm text-gray-300">Buffer size: 4000 tokens</div>
+                                    <div class="text-sm text-gray-300">Current: 1234 tokens</div>
+                                    <div class="text-sm text-gray-300">Usage: 31%</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <h3 class="font-semibold mb-3">Memory Flow</h3>
+                            <div class="text-sm text-gray-300 mb-3">Input → Buffer → [Processing] → Long-term + Vector Storage</div>
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span>Memory consolidation</span>
+                                    <span class="text-green-400">Active</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>Auto-cleanup</span>
+                                    <span class="text-yellow-400">Scheduled</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>Vector indexing</span>
+                                    <span class="text-blue-400">Running</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg">
+                            <h3 class="font-semibold mb-3">Memory Configuration</h3>
+                            <div class="space-y-3">
+                                <div><label class="block text-sm mb-1">Retention Policy</label>
+                                <select class="w-full"><option>Keep all memories</option><option>Auto-cleanup old</option><option>Size-based cleanup</option></select></div>
+                                <div><label class="block text-sm mb-1">Vector Similarity Threshold</label>
+                                <input type="range" min="0.1" max="1" step="0.1" value="0.7" class="w-full"><span class="text-xs text-gray-400">Current: 0.7</span></div>
+                                <div><label class="block text-sm mb-1">Max Memory Size (MB)</label>
+                                <input type="number" value="100" class="w-full"></div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="btn btn-primary flex-1">Save Configuration</button>
+                            <button class="btn btn-secondary flex-1">Reset to Default</button>
+                        </div>
+                    </div>
+                `;
+                inspectorContent.innerHTML = memoryContent;
+            };
+
+            // --- EVENT LISTENERS ---
+            document.addEventListener('mouseup', e => { if (connecting) handleConnectionEnd(e); if (isPanningCanvas) { isPanningCanvas = false; canvas.classList.remove('dragging'); } });
+            canvasContainer.addEventListener('mousedown', e => { if (e.target === canvasContainer || e.target === canvas) { isPanningCanvas = true; panStart = { x: e.clientX - canvasTransform.x, y: e.clientY - canvasTransform.y }; canvas.classList.add('dragging'); clearSelection(); showDefaultInspector(); e.preventDefault(); } });
+            document.addEventListener('mousemove', e => { if (isPanningCanvas) { canvasTransform.x = e.clientX - panStart.x; canvasTransform.y = e.clientY - panStart.y; updateCanvasTransform(); } });
+            canvasContainer.addEventListener('wheel', e => { e.preventDefault(); const rect = canvasContainer.getBoundingClientRect(), mX = e.clientX - rect.left, mY = e.clientY - rect.top; const zoom = e.deltaY > 0 ? 0.9 : 1.1; const newScale = Math.max(0.2, Math.min(3, canvasTransform.scale * zoom)); const scaleChange = newScale / canvasTransform.scale; canvasTransform.x = mX - (mX - canvasTransform.x) * scaleChange; canvasTransform.y = mY - (mY - canvasTransform.y) * scaleChange; canvasTransform.scale = newScale; updateCanvasTransform(); });
+            canvasContainer.addEventListener('dragover', e => e.preventDefault());
+            canvasContainer.addEventListener('drop', e => { e.preventDefault(); const type = e.dataTransfer.getData('node-type'); if (type) addNode(type, e); });
+            document.addEventListener('keydown', e => { if ((e.key === 'Delete' || e.key === 'Backspace') && (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) { e.preventDefault(); confirmDeleteSelected(); } });
+            document.addEventListener('click', e => { if (!e.target.closest('.connection-suggestions') && !e.target.closest('.connection-point')) { hideConnectionSuggestions(); } });
+
+            // --- INITIALIZATION ---
+            const mainInit = (isReload = false) => {
+                if (!isReload) {
+                    renderNodeLibrary();
+                    updateCanvasTransform();
+                }
+                showDefaultInspector();
+                clearSelection();
+            }
+            mainInit();
+        });
+    })();
+    </script>
+</body>
+</html>
+
